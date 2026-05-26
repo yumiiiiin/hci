@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    {
+      "source": "/starbucks",
+      "destination": "/Desktop/stbsfinal/stbsfinal.html"
+    },
+    {
+      "source": "/starbucks/:path*",
+      "destination": "/Desktop/stbsfinal/stbsfinal.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/starbucks",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
