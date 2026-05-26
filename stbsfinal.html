@@ -1,0 +1,3757 @@
+<html lang="ko"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ordi — Voice Order</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,500;0,600;1,500&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+  :root{
+    --main:#00A862; --secondary:#00CB76; --selected:#008C50;
+    --bg:#FAFAFA; --text-1:#000000; --text-2:#565656; --text-3:#737373;
+    --gray1:#F2F2F2; --gray2:#CECECE; --brown:#362415;
+    --W:402px; --H:874px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;background:#e5e5e5;display:flex;justify-content:center;align-items:flex-start;font-family:'Noto Sans KR',sans-serif;}
+  #app{
+    position:relative;width:var(--W);height:var(--H);
+    background:var(--bg);overflow:hidden;
+    border-radius:40px;box-shadow:0 20px 60px rgba(0,0,0,0.25);
+    margin:20px auto;
+    flex-shrink:0;
+  }
+  
+  /* STT active dot */
+  #stt-dot{
+    position:absolute;top:40px;left:32px;z-index:2000;
+    width:10px;height:10px;border-radius:50%;background:var(--main);
+    display:none;
+    box-shadow:0 0 0 0 rgba(0,168,98,0.4);
+    animation:stt-pulse 1.5s infinite;
+  }
+  #stt-dot.active{display:block;}
+  @keyframes stt-pulse{
+    0%{box-shadow:0 0 0 0 rgba(0,168,98,0.5);}
+    70%{box-shadow:0 0 0 8px rgba(0,168,98,0);}
+    100%{box-shadow:0 0 0 0 rgba(0,168,98,0);}
+  }
+  
+  /* Pages */
+  .page{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    background:var(--bg);overflow:hidden;
+    transform:translateX(100%);transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+    z-index:1;
+  }
+  .page.active{transform:translateX(0);z-index:10;}
+  .page.leaving{transform:translateX(-30%);z-index:5;}
+  #page-home{transform:translateX(0);z-index:10;}
+  
+  /* ── Fix component ── */
+  .fix{
+    position:absolute;top:24px;left:0;right:0;z-index:100;
+    background:var(--bg);
+  }
+  .fix-close-row{
+    display:flex;justify-content:flex-end;align-items:center;
+    padding:8px 20px;
+  }
+  .close-btn{
+    display:flex;align-items:center;gap:4px;
+    background:var(--gray1);border-radius:100px;
+    padding:4px 8px 4px 12px;cursor:pointer;user-select:none;
+  }
+  .close-btn span{font-size:16px;font-weight:600;color:var(--text-2);line-height:1.5;}
+  .close-btn svg{width:24px;height:24px;}
+  
+  .fix-ai-row{
+    display:flex;gap:8px;align-items:flex-start;
+    padding:4px 20px;
+  }
+  .ai-icon{flex-shrink:0;width:24px;height:24px;margin-top:4px;}
+  .ai-icon svg{width:100%;height:100%;}
+  .ai-text{
+    flex:1;font-size:18px;color:var(--text-2);line-height:1.5;
+  }
+  /* spinner for ai icon */
+  .ai-spinner{
+    animation:spin 1.5s linear infinite;
+    transform-origin:center;
+  }
+  @keyframes spin{100%{transform:rotate(360deg);}}
+  /* [수정 2] 시럽/드리즐 개수 조절 UI */
+  .syrup-counter {
+    display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+    border-bottom: 1px solid var(--gray1);
+  }
+  .syrup-label { flex: 1; font-size: 16px; color: var(--text-1); }
+  .counter-controls { display: flex; align-items: center; gap: 6px; }
+  .counter-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--gray1); border: none; cursor: pointer;
+    font-size: 16px; color: var(--text-1); transition: background 0.2s;
+  }
+  .counter-btn:active { background: var(--gray2); }
+  .counter-value {
+    min-width: 20px; text-align: center; font-weight: 600;
+    color: var(--text-1); font-size: 16px;
+  }
+  
+  /* ── VoiceInteraction ── */
+  .vi{
+    position:absolute;bottom:0;left:0;right:0;height:220px;
+    overflow:hidden;z-index:50;
+  }
+  .vi-bg{
+    position:absolute;inset:0;
+    background:radial-gradient(ellipse 120% 80% at 50% 70%, var(--secondary) 0%, rgba(0,203,118,0.5) 40%, transparent 70%);
+  }
+  .vi-split-left{
+    position:absolute;left:0;bottom:0;width:50%;height:120px;
+    background:linear-gradient(to top,#CECECE,#A1A1A1);
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  }
+  .vi-split-right{
+    position:absolute;right:0;bottom:0;width:50%;height:120px;
+    background:linear-gradient(to top,var(--main),var(--secondary));
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  }
+  .vi-btn-label{
+    font-size:20px;font-weight:600;color:#fff;
+    text-shadow:0 0 4px rgba(0,0,0,0.3);
+    display:flex;align-items:center;gap:8px;
+  }
+  .vi-center{
+    position:absolute;left:50%;bottom:60px;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .speak-btn{
+    width:80px;height:80px;border-radius:50%;
+    background:var(--main);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;user-select:none;
+    box-shadow:0 4px 20px rgba(0,168,98,0.4);
+    transition:transform 0.15s;flex-shrink:0;
+  }
+  .speak-btn:active{transform:scale(0.95);}
+  .speak-btn.listening{background:var(--selected);}
+  .speak-label{
+    font-size:18px;font-weight:600;color:#fff;
+    text-shadow:0 0 10px rgba(0,0,0,0.3);
+    white-space:nowrap;
+  }
+  
+  /* Talk bubble */
+  .talk-bubble{
+    position:absolute;bottom:200px;left:50%;transform:translateX(-50%);
+    max-width:340px;min-height:36px;
+    background:rgba(255,255,255,0.92);
+    border-radius:20px;padding:8px 16px;
+    font-size:15px;color:var(--text-1);line-height:1.5;
+    box-shadow:0 2px 12px rgba(0,0,0,0.1);
+    display:none;z-index:60;text-align:center;
+    border:1px solid var(--gray1);
+  }
+  .talk-bubble.visible{display:block;}
+  .talk-interim{color:var(--text-3);}
+  
+  /* ── HOME PAGE ── */
+  #page-home{background:#fff;}
+  .home-header-text{
+    position:absolute;top:70px;left:22px;
+    font-family:'Playfair Display',sans-serif;font-weight:500;
+    font-size:24px;color:var(--brown);line-height:1.48;
+  }
+  .home-alarm{
+    position:absolute;top:54px;right:28px;
+    width:32px;height:32px;mix-blend-mode:multiply;
+  }
+  .home-pills-row{
+    position:absolute;top:165px;left:20px;right:0;
+    display:flex;gap:8px;align-items:center;
+  }
+  .home-pill{
+    background:#fff;border-radius:22px;height:44px;
+    display:flex;align-items:center;gap:6px;padding:0 14px;
+    box-shadow:5px 5px 24px 2px rgba(0,0,0,0.1);
+    white-space:nowrap;font-family:'Inter',sans-serif;
+  }
+  .home-pill.welcome-pill{min-width:160px;}
+  .home-pill.coupon-pill{min-width:120px;}
+  .home-pill.pay-pill{width:44px;padding:0;justify-content:center;border-radius:0 22px 22px 0;}
+  .home-pill-label{font-size:14px;color:#6b6b6b;letter-spacing:0.3px;}
+  .home-pill-count{font-size:17px;font-weight:700;color:#000;font-family:'Inter',sans-serif;}
+  .home-pill-sub{font-size:14px;color:#9e9e9e;font-weight:600;font-family:'Inter',sans-serif;}
+  .home-new-badge{
+    position:absolute;top:148px;left:20px;
+    background:#000;border-radius:2px;
+    padding:2px 6px;
+    font-family:'Inter',sans-serif;font-size:10px;font-weight:400;
+    color:#fff;letter-spacing:0.2px;
+  }
+  
+  .home-promo-section{
+    position:absolute;top:234px;left:10px;right:10px;
+    padding:10px;
+  }
+  .home-promo-title{
+    font-family:'Noto Sans KR',sans-serif;font-weight:500;
+    font-size:19px;color:#000;letter-spacing:0.38px;
+    margin-bottom:4px;
+  }
+  .home-promo-sub{
+    font-family:'Inter',sans-serif;font-weight:500;
+    font-size:14px;color:var(--text-3);
+  }
+  
+  /* Voiceorderbtn */
+  .voice-order-btn{
+    position:absolute;top:295px;left:50%;transform:translateX(-50%);
+    width:400px;height:148px;
+    background:none;border:none;
+    border-radius:12px;overflow:hidden;cursor:pointer;
+    box-shadow:none;
+    user-select:none;transition:transform 0.15s;
+  }
+  .voice-order-btn:active{transform:translateX(-50%) scale(0.98);}
+  .vob-gra1{
+    position:absolute;inset:0;
+    background:radial-gradient(ellipse 180% 200% at 85% 50%, rgba(0,203,118,0.55) 0%, rgba(0,203,118,0.1) 50%, transparent 70%);
+    pointer-events:none;
+  }
+  .vob-gra2{
+    position:absolute;right:-20px;top:-20px;width:180px;height:160px;
+    background:radial-gradient(circle, rgba(0,168,98,0.3) 0%, transparent 70%);
+    pointer-events:none;
+  }
+  .vob-upgrade{
+    position:absolute;top:6px;left:19px;
+    font-size:14.8px;font-weight:600;color:var(--main);
+    font-family:'Noto Sans KR',sans-serif;
+  }
+  .vob-title-row{
+    position:absolute;top:40px;left:20px;
+    display:flex;align-items:center;gap:4px;
+  }
+  .vob-title{
+    font-size:17px;font-weight:700;color:var(--brown);
+    font-family:'Noto Sans KR',sans-serif;
+  }
+  .vob-chevron{width:25px;height:25px;}
+  .vob-sub{
+    position:absolute;top:68px;left:19px;
+    font-size:12px;color:var(--text-2);
+    font-family:'Noto Sans KR',sans-serif;
+    max-width:218px;line-height:1.5;
+  }
+  .vob-wave-icon{
+    position:absolute;right:50px;top:12px;
+    width:80px;height:82px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .vob-circle{
+    position:absolute;right:14px;bottom:24px;
+    width:50px;height:50px;border-radius:50%;
+    background:var(--main);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 4px 12px rgba(0,168,98,0.3);
+  }
+  
+  /* Drinks section */
+  .home-drinks-section{
+    position:absolute;top:450px;left:20px;right:20px;
+  }
+  .home-drinks-title{
+    font-family:'Playfair Display',sans-serif;font-weight:500;
+    font-size:19px;color:#000;letter-spacing:-1.3px;
+    margin-bottom:4px;
+  }
+  .home-drinks-sub{
+    font-family:'Inter',sans-serif;font-size:14px;color:var(--text-3);
+    margin-bottom:18px;
+  }
+  .home-drinks-grid{
+    display:flex;gap:10px;
+  }
+  .home-drink-card{
+    width:134px;height:134px;border-radius:50%;
+    background:linear-gradient(135deg,#d4825a,#c4693a);
+    overflow:hidden;display:flex;align-items:flex-end;justify-content:center;
+    position:relative;flex-shrink:0;
+  }
+  .home-drink-img{
+    width:70%;height:90%;object-fit:cover;
+    position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  }
+  .home-drink-name{
+    position:absolute;bottom:-50px;left:0;right:0;
+    text-align:center;font-size:13px;color:#000;
+    font-family:'Inter',sans-serif;letter-spacing:-0.69px;
+    line-height:1.3;
+  }
+  
+  /* Delivers button */
+  .home-delivers-btn{
+    position:absolute;bottom:150px;right:16px;
+    background:#00b475;border-radius:30px;
+    height:58px;padding:0 18px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;
+  }
+  .home-delivers-text{
+    font-family:'Inter',sans-serif;font-size:20px;font-weight:600;
+    color:#fff;letter-spacing:-0.6px;
+  }
+  
+  /* Bottom nav */
+  .home-bottom-bar{
+    position:absolute;bottom:0;left:0;right:0;height:90px;
+    background:linear-gradient(to right,#f8f8f8 36%,#eff0ef 62%,#dbdfdd);
+    display:flex;align-items:flex-start;justify-content:space-around;
+    padding-top:8px;
+  }
+  .nav-item{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    cursor:pointer;user-select:none;padding:4px 8px;
+  }
+  .nav-item img{width:24px;height:24px;object-fit:contain;}
+  .nav-item span{
+    font-family:'Inter',sans-serif;font-size:11.7px;
+    color:#aeaeae;letter-spacing:-0.23px;
+  }
+  .nav-item.active span{color:#00b37a;}
+  .home-indicator{
+    position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+    width:145px;height:4px;border-radius:10px;background:#000;
+  }
+  
+  /* ── MODAL overlay ── */
+  .modal-overlay{
+    position:absolute;inset:0;
+    background:rgba(0,0,0,0.45);z-index:200;
+    display:none;align-items:center;justify-content:center;
+  }
+  .modal-overlay.visible{display:flex;}
+  .modal-box{
+    width:346px;background:#fff;border-radius:20px;
+    padding:32px 24px 24px;
+    display:flex;flex-direction:column;align-items:center;gap:20px;
+  }
+  .modal-title{
+    font-size:20px;font-weight:700;color:var(--text-1);
+    text-align:center;line-height:1.5;
+  }
+  .modal-sub{
+    font-size:16px;color:var(--text-2);text-align:center;line-height:1.5;
+    margin-top:-12px;
+  }
+  .modal-btns{
+    display:flex;gap:12px;width:100%;
+  }
+  .modal-btn{
+    flex:1;height:52px;border-radius:12px;
+    font-size:18px;font-weight:600;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    border:none;user-select:none;
+  }
+  .modal-btn-cancel{background:var(--gray1);color:var(--text-1);}
+  .modal-btn-confirm{background:var(--main);color:#fff;}
+  
+  /* ── Translation page ── */
+  .trans-center{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+    display:flex;flex-direction:column;align-items:center;gap:24px;
+  }
+  .trans-ring{
+    position:relative;width:120px;height:120px;
+  }
+  .trans-ring svg{transform:rotate(-90deg);}
+  .trans-ring-track{fill:none;stroke:#eee;stroke-width:8;}
+  .trans-ring-fill{
+    fill:none;stroke:var(--main);stroke-width:8;
+    stroke-linecap:round;
+    stroke-dasharray:345;stroke-dashoffset:345;
+    transition:stroke-dashoffset 0.1s linear;
+  }
+  .trans-drink-img{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:80px;height:80px;border-radius:50%;object-fit:cover;
+  }
+  .trans-label{
+    font-size:18px;color:var(--text-2);text-align:center;line-height:1.5;
+  }
+  .trans-label strong{color:var(--text-1);font-weight:700;}
+  
+  /* ── OrderCheck page ── */
+  .order-card{
+    position:absolute;top:177px;left:20px;right:20px;
+    background:#fff;border-radius:16px;padding:16px;
+    box-shadow:0 2px 12px rgba(0,0,0,0.06);
+  }
+  .order-card-inner{
+    display:flex;gap:12px;align-items:flex-start;
+  }
+  .order-drink-img{
+    width:82px;height:80px;border-radius:100px;
+    object-fit:cover;flex-shrink:0;
+  }
+  .order-info{flex:1;display:flex;flex-direction:column;gap:16px;}
+  .order-name-block{}
+  .order-name{font-size:20px;font-weight:700;color:#1a1c1b;line-height:1.5;}
+  .order-name-en{font-size:16px;color:var(--gray2);line-height:1.5;}
+  .order-options{display:flex;flex-direction:column;gap:4px;}
+  .order-opt-row{
+    display:flex;justify-content:space-between;align-items:center;
+    height:auto;
+  }
+  .order-opt-label{
+    font-size:16px;color:var(--text-3);line-height:1.5;
+  }
+  .order-opt-price{
+    font-size:16px;font-weight:600;color:var(--text-3);line-height:1.5;
+  }
+  .order-opt-row.highlighted .order-opt-label,
+  .order-opt-row.highlighted .order-opt-price{
+    color:var(--selected);
+  }
+  .order-total-row{
+    display:flex;justify-content:flex-end;
+    margin-top:4px;
+  }
+  .order-total{
+    font-size:16px;font-weight:700;color:var(--brown);
+  }
+  /* ── AddToCart ── */
+  .addcart-center{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+    display:flex;flex-direction:column;align-items:center;gap:20px;
+  }
+  .addcart-label{
+    font-size:18px;color:var(--text-2);text-align:center;line-height:1.5;
+  }
+  .addcart-label strong{color:var(--text-1);font-weight:700;}
+  
+  /* ── Cart page ── */
+  .cart-page-inner{
+    position:absolute;top:100px;left:20px;right:20px;bottom:20px;
+    overflow-y:auto;
+  }
+  .cart-title{
+    font-size:22px;font-weight:700;color:var(--text-1);
+    margin-bottom:16px;padding-top:8px;
+  }
+  .cart-empty{
+    text-align:center;color:var(--text-3);font-size:16px;
+    margin-top:40px;
+  }
+  .cart-checkout-btn{
+    position:absolute;bottom:30px;left:20px;right:20px;height:56px;
+    background:var(--main);border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;font-weight:700;color:#fff;cursor:pointer;
+  }
+  
+  /* ── Recommend menu ── */
+  .recommend-grid{
+    position:absolute;top:177px;left:20px;right:20px;
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .rec-card{
+    background:#fff;border-radius:16px;padding:16px;
+    display:flex;align-items:center;gap:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    border:2px solid transparent;cursor:pointer;transition:border-color 0.2s;
+  }
+  .rec-card.selected{border-color:var(--main);}
+  .rec-card-img{width:80px;height:78px;border-radius:100px;object-fit:cover;flex-shrink:0;}
+  .rec-card-info{flex:1;}
+  .rec-card-name{font-size:18px;font-weight:700;color:var(--text-1);}
+  .rec-card-en{font-size:14px;color:var(--gray2);margin-top:2px;}
+  .rec-card-price{font-size:16px;font-weight:600;color:var(--brown);margin-top:8px;}
+  .rec-checkbox{
+    width:22px;height:22px;border-radius:50%;
+    border:2px solid var(--gray2);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s;
+  }
+  .rec-card.selected .rec-checkbox{background:var(--main);border-color:var(--main);}
+  
+  /* ── Request1 (contradiction) ── */
+  .req-btns{
+    position:absolute;top:260px;left:20px;right:20px;
+    display:flex;gap:12px;
+  }
+  .req-btn{
+    flex:1;height:72px;border-radius:16px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:700;cursor:pointer;
+    border:2px solid var(--gray2);color:var(--text-1);
+    transition:all 0.2s;user-select:none;
+  }
+  .req-btn.selected{background:var(--main);border-color:var(--main);color:#fff;}
+  
+  /* ── Reorder ── */
+  .reorder-options{
+    position:absolute;top:177px;left:20px;right:0px;bottom:220px;overflow-y:auto;padding-right:20px;height:530px;
+  }
+  .reorder-subtitle{
+    font-size:15px;color:var(--text-3);margin-bottom:12px;
+  }
+  .opt-toggle{
+    width:100%;border-radius:14px;
+    border:2px solid transparent;
+    background:#fff;margin-bottom:8px;overflow:hidden;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer;
+  }
+  .opt-toggle.highlighted{border-color:var(--selected);}
+  .opt-toggle-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 16px;height:72px;
+  }
+  .opt-toggle-left{display:flex;align-items:center;gap:10px;}
+  .opt-toggle-name{font-size:17px;font-weight:600;color:var(--text-1);}
+  .opt-toggle-val{font-size:16px;color:var(--text-3);}
+  .opt-toggle-arrow{
+    width:22px;height:22px;transition:transform 0.25s;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .opt-toggle.open .opt-toggle-arrow{transform:rotate(180deg);}
+  .opt-toggle-body{
+    display:none;padding:0 12px 12px;
+  }
+  .opt-toggle.open .opt-toggle-body{display:block;}
+  .opt-sub-btn{
+    width:100%;height:48px;border-radius:10px;border:none;
+    background:var(--gray1);color:var(--text-1);
+    font-size:16px;font-family:'Noto Sans KR',sans-serif;
+    cursor:pointer;margin-bottom:4px;text-align:left;padding:0 16px;
+    display:flex;align-items:center;justify-content:space-between;
+    transition:background 0.15s;
+  }
+  .opt-sub-btn:last-child{margin-bottom:0;}
+  .opt-sub-btn.active{background:var(--main);color:#fff;font-weight:700;}
+  .opt-sub-btn.active .opt-sub-check{display:block;}
+  .opt-sub-check{display:none;color:#fff;}
+  
+  /* ── OptionList ── */
+  .optlist-wrap{
+    position:absolute;top:177px;left:20px;right:20px;bottom:230px;
+    overflow-y:auto;
+  }
+  
+  /* ── Generic button row ── */
+  .btn-row{
+    position:absolute;bottom:220px;left:0;right:0;
+    display:flex;height:120px;
+  }
+  /* The select VoiceInteraction variant already splits bottom */
+  
+  /* ── Play state (inactivity) ── */
+  .vi-play-overlay{
+    position:absolute;inset:0;
+    background:rgba(0,0,0,0.15);
+    display:none;align-items:center;justify-content:center;
+    border-radius:inherit;z-index:2;
+  }
+  .vi-play-overlay.visible{display:flex;}
+  .vi-play-msg{
+    font-size:16px;font-weight:600;color:#fff;
+    text-align:center;line-height:1.5;
+    text-shadow:0 1px 4px rgba(0,0,0,0.4);
+  }
+  
+  /* Reorder2 */
+  .reorder2-ai{
+    position:absolute;top:177px;left:20px;right:20px;
+    background:#fff;border-radius:16px;padding:16px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  }
+  
+  /* Waveform bars animation */
+  @keyframes wave-bar{
+    0%,100%{height:8px;}
+    50%{height:22px;}
+  }
+  .wave-bar{
+    width:4px;border-radius:2px;background:currentColor;
+    display:inline-block;margin:0 2px;
+    animation:wave-bar 0.8s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(1){animation-delay:0s;}
+  .wave-bar:nth-child(2){animation-delay:0.15s;}
+  .wave-bar:nth-child(3){animation-delay:0.3s;}
+  .wave-bar:nth-child(4){animation-delay:0.45s;}
+  .wave-bar:nth-child(5){animation-delay:0.6s;}
+  
+  /* Circular progress ring */
+  @keyframes progress-fill{
+    from{stroke-dashoffset:345;}
+    to{stroke-dashoffset:0;}
+  }
+  
+  /* Scroll hide */
+  .optlist-wrap::-webkit-scrollbar{display:none;}
+  .cart-page-inner::-webkit-scrollbar{display:none;}
+  </style>
+  </head>
+  <body style="overscroll-behavior: none;">
+  <div id="app">
+  
+    <!-- STT Active Dot -->
+    <div id="stt-dot" class=""></div>
+  
+    <!-- ══════════════════════════════════════
+         PAGE: HOME
+    ══════════════════════════════════════ -->
+    <div id="page-home" class="page active" style="transform: translateX(0px);">
+      <!-- header text -->
+      <div class="home-header-text">
+        수룡이님, 쿠폰사용<br>기간이 얼마 남지 않았네요!
+      </div>
+  
+      <!-- Alarm icon -->
+      <div class="home-alarm" style="position:absolute;top:54px;right:24px;">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M14 25.67a2.33 2.33 0 0 0 2.33-2.33H11.67A2.33 2.33 0 0 0 14 25.67Zm7-7V13c0-3.59-1.91-6.6-5.25-7.4V4.83a1.75 1.75 0 0 0-3.5 0v.77C8.91 6.4 7 9.4 7 13v5.67L4.67 21v1.17h18.66V21L21 18.67Z" fill="#362415"></path>
+          <circle cx="21" cy="7" r="4" fill="#00CB76"></circle>
+        </svg>
+      </div>
+  
+      <!-- pills row -->
+      <div class="home-new-badge">NEW</div>
+      <div class="home-pills-row">
+        <div class="home-pill welcome-pill">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1l2.06 4.18 4.62.67-3.34 3.25.79 4.59L9 11.44 4.87 13.69l.79-4.59L2.32 5.85l4.62-.67L9 1Z" fill="#FFD700" stroke="#FFD700" stroke-width="0.5"></path></svg>
+          <span class="home-pill-label">Welcome</span>
+          <span class="home-pill-count">1</span><span class="home-pill-sub">/5</span>
+        </div>
+        <div class="home-pill coupon-pill">
+          <svg width="20" height="14" viewBox="0 0 20 14"><rect x="0.5" y="0.5" width="19" height="13" rx="2.5" stroke="#ccc" fill="none"></rect><circle cx="5" cy="7" r="3" fill="#eee" stroke="#ccc"></circle><line x1="9" y1="4" x2="9" y2="10" stroke="#ccc"></line><rect x="11" y="4" width="6" height="1.5" rx="0.75" fill="#ccc"></rect><rect x="11" y="7" width="4" height="1.5" rx="0.75" fill="#ccc"></rect></svg>
+          <span class="home-pill-label">Coupon</span>
+          <div style="width:5px;height:5px;border-radius:50%;background:#e53935;margin-left:-4px;margin-top:-8px;"></div>
+        </div>
+        <div class="home-pill pay-pill">
+          <svg width="20" height="16" viewBox="0 0 20 16"><rect x="1" y="3" width="18" height="12" rx="2" stroke="#333" stroke-width="1.5" fill="none"></rect><line x1="1" y1="7" x2="19" y2="7" stroke="#333" stroke-width="2"></line><rect x="3" y="10" width="4" height="2" rx="1" fill="#333"></rect></svg>
+        </div>
+      </div>
+  
+      <!-- promo text -->
+      <div class="home-promo-section">
+        <div class="home-promo-title">복잡한 옵션도 한번에!</div>
+        <div class="home-promo-sub">터치보다 빠른 나만의 보이스 오더를 시작해보세요!</div>
+      </div>
+  
+      <!-- Voice Order Button -->
+      <div class="voice-order-btn" onclick="enterVoiceOrder()" role="button" aria-label="Voice Order 사용하기">
+        <img src="Voiceorderbtn.png" alt="Voice Order" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">
+      </div>
+  
+      <!-- Drinks section -->
+      <div class="home-drinks-section">
+        <div class="home-drinks-title">우리가 가을을 기다리는 이유</div>
+        <div class="home-drinks-sub">다 함께 즐기기 좋은 가을 신메뉴를 만나보세요!</div>
+        <div class="home-drinks-grid">
+          <div style="position:relative;flex-shrink:0;">
+            <div class="home-drink-card" style="background:#D4784C;">
+              <img class="home-drink-img" src="음료3.png" alt="블랙 글레이즈드 라떼">
+            </div>
+            <div class="home-drink-name">아이스 블랙 글레이즈드<br>라떼</div>
+          </div>
+          <div style="position:relative;flex-shrink:0;">
+            <div class="home-drink-card" style="background:#D4784C;">
+              <img class="home-drink-img" src="음료1.png" alt="아이스 말차">
+            </div>
+            <div class="home-drink-name">아이스 말차<br>라떼</div>
+          </div>
+          <div style="position:relative;flex-shrink:0;">
+            <div class="home-drink-card" style="background:#D4784C;">
+              <img class="home-drink-img" src="음료2.png" alt="마롱 라떼" style="object-fit:contain;">
+            </div>
+            <div class="home-drink-name">마롱 라떼</div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Delivers btn -->
+      <div class="home-delivers-btn">
+        <svg width="28" height="22" viewBox="0 0 28 22" fill="none"><circle cx="7" cy="18" r="3.5" stroke="white" stroke-width="1.5"></circle><circle cx="21" cy="18" r="3.5" stroke="white" stroke-width="1.5"></circle><path d="M2 14 L2 8 L14 4 L22 4 L26 10 L26 14" stroke="white" stroke-width="1.5" stroke-linejoin="round"></path><line x1="2" y1="14" x2="10.5" y2="14" stroke="white" stroke-width="1.5"></line><line x1="17.5" y1="14" x2="26" y2="14" stroke="white" stroke-width="1.5"></line></svg>
+        <span class="home-delivers-text">Delivers</span>
+      </div>
+  
+      <!-- Bottom nav -->
+      <div class="home-bottom-bar">
+        <div class="nav-item active">
+          <svg width="26" height="24" viewBox="0 0 26 24" fill="none"><path d="M3 9.5L13 2L23 9.5V21C23 21.55 22.55 22 22 22H16V16H10V22H4C3.45 22 3 21.55 3 21V9.5Z" fill="#00b37a"></path></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg width="28" height="18" viewBox="0 0 28 18" fill="none"><rect x="1" y="3" width="26" height="13" rx="3" stroke="#aeaeae" stroke-width="1.5" fill="none"></rect><line x1="1" y1="7.5" x2="27" y2="7.5" stroke="#aeaeae" stroke-width="2"></line><rect x="4" y="11" width="5" height="2" rx="1" fill="#aeaeae"></rect></svg>
+          <span>Pay</span>
+        </div>
+        <div class="nav-item">
+          <svg width="24" height="26" viewBox="0 0 24 26" fill="none"><path d="M2 8H22L20 22H4L2 8Z" stroke="#aeaeae" stroke-width="1.5" fill="none"></path><path d="M8 8V6C8 3.79 9.79 2 12 2s4 1.79 4 4v2" stroke="#aeaeae" stroke-width="1.5" stroke-linecap="round"></path></svg>
+          <span>Order</span>
+        </div>
+        <div class="nav-item">
+          <svg width="24" height="26" viewBox="0 0 24 26" fill="none"><path d="M12 2C8.69 2 6 4.69 6 8c0 5.25 6 13 6 13s6-7.75 6-13c0-3.31-2.69-6-6-6Zm0 8.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5Z" fill="#aeaeae"></path></svg>
+          <span>Shop</span>
+        </div>
+        <div class="nav-item">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="transform:translateY(-8px)"><circle cx="3" cy="12" r="2.5" fill="#aeaeae"></circle><circle cx="12" cy="12" r="2.5" fill="#aeaeae"></circle><circle cx="21" cy="12" r="2.5" fill="#aeaeae"></circle></svg>
+          <span>Other</span>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div><!-- /page-home -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0 Start
+    ══════════════════════════════════════ -->
+    <div id="page-start" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModal()">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+      </div>
+      <!-- main text (no Fix AI row on 0 Start) -->
+      <div style="position:absolute;top:170px;left:0;right:0;padding:0 36px;text-align:center;">
+        <div style="font-size:20px;font-weight:700;color:#000;line-height:1.5;margin-bottom:16px;">
+          안녕하세요, 듣고 있어요!<br>어떤 음료를 준비해드릴까요?
+        </div>
+        <div style="font-size:18px;color:#565656;line-height:1.5;">
+          퍼스널 옵션도 한 번에 말씀하실 수 있어요
+        </div>
+      </div>
+  
+      <!-- VoiceInteraction: default (listen state) -->
+      <div class="vi" id="vi-start">
+        <div class="vi-bg"></div>
+        <div class="vi-play-overlay" id="vi-start-play" onclick="removePlayOverlay('start')">
+          <div class="vi-play-msg">탭하여 음성인식<br>다시 시작하기</div>
+        </div>
+        <div class="vi-center">
+          <div class="speak-btn" id="speakBtn-start" onclick="toggleSTT()">
+            <div id="speakBtn-start-icon" style="color:white;display:flex;align-items:center;gap:2px;">
+              <span class="wave-bar" style="color:white;background:white;"></span>
+              <span class="wave-bar" style="color:white;background:white;"></span>
+              <span class="wave-bar" style="color:white;background:white;"></span>
+              <span class="wave-bar" style="color:white;background:white;"></span>
+              <span class="wave-bar" style="color:white;background:white;"></span>
+            </div>
+          </div>
+          <div class="speak-label" id="speak-label-start">듣고 있어요</div>
+        </div>
+      </div>
+      <div class="talk-bubble" id="talk-bubble-start"></div>
+  
+      <!-- Close Modal -->
+      <div class="modal-overlay" id="close-modal" onclick="handleModalOverlay(event)">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-sub">현재 주문 내역이 초기화됩니다</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrder()">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-start -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-1 Translation
+    ══════════════════════════════════════ -->
+    <div id="page-translation" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModal2()">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon"><svg class="ai-spinner" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="#00A862" stroke-width="2" stroke-linecap="round"></path></svg></div>
+          <div class="ai-text" id="trans-ai-text">주문 내용을 분석하고 있어요...</div>
+        </div>
+      </div>
+  
+      <div class="trans-center">
+        <div class="trans-ring">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle class="trans-ring-track" cx="60" cy="60" r="55"></circle>
+            <circle class="trans-ring-fill" id="trans-ring-fill" cx="60" cy="60" r="55" style="stroke-dashoffset: 0;"></circle>
+          </svg>
+          <img id="trans-drink-img" class="trans-drink-img" src="https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg" alt="drink" onerror="this.style.display='none'">
+        </div>
+        <div class="trans-label" id="trans-label">
+          <strong id="trans-menu-name"></strong>를<br>주문하시는군요!
+        </div>
+      </div>
+  
+      <div class="vi" id="vi-trans">
+        <div class="vi-bg"></div>
+        <div class="vi-center">
+          <div class="speak-btn" style="background:#ccc;">
+            <div style="color:white;display:flex;align-items:center;gap:2px;">
+              <span style="width:4px;height:8px;border-radius:2px;background:white;display:inline-block;"></span>
+              <span style="width:4px;height:8px;border-radius:2px;background:white;display:inline-block;"></span>
+              <span style="width:4px;height:8px;border-radius:2px;background:white;display:inline-block;"></span>
+              <span style="width:4px;height:8px;border-radius:2px;background:white;display:inline-block;"></span>
+              <span style="width:4px;height:8px;border-radius:2px;background:white;display:inline-block;"></span>
+            </div>
+          </div>
+          <div class="speak-label">처리 중...</div>
+        </div>
+      </div>
+  
+      <!-- Modal for this page too -->
+      <div class="modal-overlay" id="close-modal-2" onclick="handleModalOverlay2(event)">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-sub">현재 주문 내역이 초기화됩니다</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrder2()">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-translation -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-2 OrderCheck
+    ══════════════════════════════════════ -->
+    <div id="page-ordercheck" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModalAny('ordercheck')">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#00A862" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
+          <div class="ai-text">주문 내용을 확인할게요.
+맞으면 '주문', 틀리면 '수정'이라고 말씀해 주세요!</div>
+        </div>
+      </div>
+  
+      <!-- Order Card -->
+      <div class="order-card" id="ordercheck-card">
+        <div class="order-card-inner">
+          <img class="order-drink-img" src="https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg" alt="음료" onerror="this.style.background='#ddd'">
+          <div class="order-info">
+            <div class="order-name-block">
+              <div class="order-name" id="oc-menu-name">메뉴 미정</div>
+              <div class="order-name-en" id="oc-menu-en"></div>
+            </div>
+            <div class="order-options" id="oc-options">
+              <div class="order-opt-row" id="oc-row-base">
+                <span class="order-opt-label" id="oc-base-label">HOT  |  Tall</span>
+                <span class="order-opt-price" id="oc-base-price">5,200원</span>
+              </div>
+              <div class="order-opt-row" id="oc-row-shot" style="display: none;">
+                <span class="order-opt-label" id="oc-shot-label">에스프레소샷 2</span>
+                <span class="order-opt-price" id="oc-shot-price">800원</span>
+              </div>
+              <div class="order-opt-row" id="oc-row-syrup" style="display: none;">
+                <span class="order-opt-label" id="oc-syrup-label">헤이즐넛 시럽 1</span>
+                <span class="order-opt-price" id="oc-syrup-price">800원</span>
+              </div>
+              <div class="order-opt-row" id="oc-row-ice" style="display: none;">
+                <span class="order-opt-label" id="oc-ice-label">얼음 적게</span>
+                <span class="order-opt-price" id="oc-ice-price">0원</span>
+              </div>
+              <div class="order-opt-row">
+                <span class="order-opt-label">수량</span>
+                <span class="order-opt-price">1</span>
+              </div>
+            </div>
+            <div class="order-total-row">
+              <span class="order-total" id="oc-total">5,900원</span>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- VoiceInteraction Select variant -->
+      <div class="vi" id="vi-ordercheck">
+        <div class="vi-split-left" onclick="goToReorder()">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M14.7 6.3L13.3 4.9 10 8.19 6.7 4.9 5.3 6.3 8.59 9.6 5.3 12.9l1.4 1.4L10 11.01l3.3 3.29 1.4-1.4L11.41 9.6z" fill="white"></path><path d="M3 17h14v2H3v-2z" fill="white"></path></svg>
+            수정하기
+          </div>
+        </div>
+        <div class="vi-split-right" onclick="goToConfirm()">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 2H18v14l-2-1-2 1-2-1-2 1-2-1-2 1V2zm0 18H2V6l4 2v12z" stroke="white" stroke-width="1.5" fill="none"></path></svg>
+            주문하기
+          </div>
+        </div>
+      </div>
+      <div class="talk-bubble" id="talk-bubble-ordercheck"></div>
+  
+      <div class="modal-overlay" id="close-modal-oc" onclick="handleModalOverlayAny(event,'ordercheck')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-sub">현재 주문 내역이 초기화됩니다</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrderAny('ordercheck')">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-ordercheck -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-3 Confirm
+    ══════════════════════════════════════ -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-4 AddToCart
+    ══════════════════════════════════════ -->
+    <div id="page-addtocart" class="page">
+      <div class="fix">
+        <div class="fix-close-row"><div style="height:40px;"></div></div>
+      </div>
+      <div class="addcart-center">
+        <div class="trans-ring">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle class="trans-ring-track" cx="60" cy="60" r="55"></circle>
+            <circle class="trans-ring-fill" id="addcart-ring-fill" cx="60" cy="60" r="55"></circle>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg);">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M8 20l8 8 16-16" stroke="#00A862" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+        </div>
+        <div class="addcart-label">
+          <strong id="addcart-menu-name">아이스 카페 라떼</strong>를<br>장바구니에 담고 있어요...
+        </div>
+      </div>
+      <div class="vi">
+        <div class="vi-bg"></div>
+      </div>
+    </div><!-- /page-addtocart -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 장바구니 Cart
+    ══════════════════════════════════════ -->
+    <div id="page-cart" class="page">
+      <div style="position:absolute;top:44px;left:0;right:0;padding:8px 20px;display:flex;align-items:center;gap:12px;">
+        <div onclick="goBack()" style="cursor:pointer;padding:4px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#000" stroke-width="2" stroke-linecap="round"></path></svg>
+        </div>
+        <span style="font-size:20px;font-weight:700;">장바구니</span>
+      </div>
+      <div class="cart-page-inner">
+        <!-- Order Card (reorder2-card와 동일) -->
+        <div class="order-card" id="cart-order-card">
+          <div class="order-card-inner">
+            <img class="order-drink-img" src="https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg" alt="음료" onerror="this.style.background='#ddd'">
+            <div class="order-info">
+              <div class="order-name-block">
+                <div class="order-name" id="cart-ro-name">메뉴 미정</div>
+                <div class="order-name-en" id="cart-ro-en"></div>
+              </div>
+              <div class="order-options" id="cart-ro-options">
+                <div class="order-opt-row">
+                  <span class="order-opt-label">ICED | Tall</span>
+                  <span class="order-opt-price">6,800원</span>
+                </div>
+              </div>
+              <div class="order-total-row">
+                <span class="order-total" id="cart-ro-total">6,800원</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cart-checkout-btn" onclick="alert('결제 화면으로 이동합니다.')">
+        결제하기
+      </div>
+    </div><!-- /page-cart -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-2-1 RecommendMenu
+    ══════════════════════════════════════ -->
+    <div id="page-recommend" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModalAny('recommend')">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#00A862" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+          <div class="ai-text">말씀하신 옵션에 맞는 메뉴를 추천해드릴게요. 원하시는 메뉴를 선택해 주세요!</div>
+        </div>
+      </div>
+  
+      <div class="recommend-grid">
+        <div class="rec-card" id="rec-0" onclick="selectRec(0)">
+          <img class="rec-card-img" src="https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg" alt="" onerror="this.style.background='#ddd'">
+          <div class="rec-card-info">
+            <div class="rec-card-name">스타벅스 딸기 라떼</div>
+            <div class="rec-card-en">Starbucks Strawberry Latte</div>
+            <div class="rec-card-price">6,500원~</div>
+          </div>
+          <div class="rec-checkbox" id="rec-cb-0">
+            <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style="display:none;" id="rec-check-0"><path d="M1 5l3.5 3.5 6.5-7.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+        </div>
+        <div class="rec-card" id="rec-1" onclick="selectRec(1)">
+          <div class="rec-card-img" style="background:linear-gradient(145deg,#4a7c4e,#2d5a27);display:flex;align-items:center;justify-content:center;">
+            <svg width="40" height="60" viewBox="0 0 40 60" fill="none"><path d="M5 10 Q4 30 5 45 Q6 54 20 56 Q34 54 35 45 Q36 30 35 10Z" fill="#355e3b" opacity="0.7"></path></svg>
+          </div>
+          <div class="rec-card-info">
+            <div class="rec-card-name">아이스 제주 말차 라떼</div>
+            <div class="rec-card-en">Iced Jeju Matcha Latte</div>
+            <div class="rec-card-price">6,100원~</div>
+          </div>
+          <div class="rec-checkbox" id="rec-cb-1">
+            <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style="display:none;" id="rec-check-1"><path d="M1 5l3.5 3.5 6.5-7.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+        </div>
+        <div class="rec-card" id="rec-2" onclick="selectRec(2)">
+          <div class="rec-card-img" style="background:linear-gradient(145deg,#4a2c1a,#6B3A2A);display:flex;align-items:center;justify-content:center;">
+            <svg width="42" height="62" viewBox="0 0 42 62" fill="none"><path d="M6 12 Q5 32 6 47 Q7 56 21 58 Q35 56 36 47 Q37 32 36 12Z" fill="#6B3A2A" opacity="0.7"></path></svg>
+          </div>
+          <div class="rec-card-info">
+            <div class="rec-card-name">자바 칩 프라푸치노</div>
+            <div class="rec-card-en">Java Chip Frappuccino</div>
+            <div class="rec-card-price">6,500원~</div>
+          </div>
+          <div class="rec-checkbox" id="rec-cb-2">
+            <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style="display:none;" id="rec-check-2"><path d="M1 5l3.5 3.5 6.5-7.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+        </div>
+      </div>
+  
+      <div class="vi">
+        <div class="vi-bg"></div>
+        <div class="vi-center">
+          <div class="speak-btn" id="speakBtn-rec" onclick="toggleSTTPage('rec')">
+            <div style="color:white;display:flex;align-items:center;gap:2px;">
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+            </div>
+          </div>
+          <div class="speak-label">듣고 있어요</div>
+        </div>
+      </div>
+      <div class="talk-bubble" id="talk-bubble-rec"></div>
+  
+      <div class="modal-overlay" id="close-modal-rec" onclick="handleModalOverlayAny(event,'recommend')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrderAny('recommend')">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-recommend -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-3-1 Request1 (contradiction)
+    ══════════════════════════════════════ -->
+    <div id="page-request1" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModalAny('request1')">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#00A862" stroke-width="1.8"></circle><path d="M12 8v4l3 3" stroke="#00A862" stroke-width="1.8" stroke-linecap="round"></path></svg></div>
+          <div class="ai-text">따뜻하게 드릴까요, 아이스로 드릴까요?</div>
+        </div>
+      </div>
+  
+      <div style="position:absolute;top:177px;left:20px;right:20px;text-align:center;">
+        <div style="font-size:17px;color:#737373;margin-bottom:24px;">주문이 조금 헷갈렸어요!<br>온도를 선택해 주세요.</div>
+      </div>
+  
+      <div class="req-btns">
+        <div class="req-btn selected" id="req-hot" onclick="selectTemp('HOT')">☕ HOT</div>
+        <div class="req-btn" id="req-iced" onclick="selectTemp('ICED')">🧊 ICED</div>
+      </div>
+  
+      <div class="vi">
+        <div class="vi-bg"></div>
+        <div class="vi-center">
+          <div class="speak-btn" id="speakBtn-req1" onclick="toggleSTTPage('req1')">
+            <div style="color:white;display:flex;align-items:center;gap:2px;">
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+              <span class="wave-bar" style="background:white;"></span>
+            </div>
+          </div>
+          <div class="speak-label">듣고 있어요</div>
+        </div>
+      </div>
+      <div class="talk-bubble visible" id="talk-bubble-req1"><span class="talk-interim">해</span></div>
+  
+      <div class="modal-overlay" id="close-modal-req1" onclick="handleModalOverlayAny(event,'request1')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrderAny('request1')">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-request1 -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-3 Reorder1 (edit mode)
+    ══════════════════════════════════════ -->
+    <div id="page-reorder1" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModalAny('reorder1')">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#00A862" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+          <div class="ai-text" id="reorder1-ai-text">어떤 옵션을 수정할까요? 말씀하시거나 아래에서 탭해주세요. 옵션수정이 완료되면 완료라고 말씀해주세요.</div>
+        </div>
+      </div>
+  
+      <div class="reorder-options" id="reorder1-options"><div class="reorder-subtitle"> 옵션</div><div class="opt-toggle highlighted" id="opt-size">
+        <div class="opt-toggle-header" onclick="toggleOptOpen('size')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">사이즈</span>
+            <span class="opt-toggle-val" id="optval-size">그란데</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-size">
+          <button class="opt-sub-btn" onclick="applyOption('size','Tall',this)">Tall<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn active" onclick="applyOption('size','그란데',this)">그란데<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('size','벤티',this)">벤티<span class="opt-sub-check">✓</span></button>
+        </div></div><div class="opt-toggle highlighted" id="opt-shot">
+        <div class="opt-toggle-header" onclick="toggleOptOpen('shot')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">에스프레소샷</span>
+            <span class="opt-toggle-val" id="optval-shot">2개 (기본 1 + 추가 1)</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-shot">
+          <button class="opt-sub-btn" onclick="applyOption('shot','1개 (추가없음)',this)">1개 (추가없음)<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn active" onclick="applyOption('shot','2개 (추가 1)',this)">2개 (추가 1)<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('shot','3개 (추가 2)',this)">3개 (추가 2)<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('shot','4개 (추가 3)',this)">4개 (추가 3)<span class="opt-sub-check">✓</span></button>
+        </div></div><div class="opt-toggle highlighted" id="opt-syrup">
+        <div class="opt-toggle-header" onclick="toggleOptOpen('syrup')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">시럽</span>
+            <span class="opt-toggle-val" id="optval-syrup">헤이즐넛 1펌프</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-syrup">
+          <button class="opt-sub-btn" onclick="applyOption('syrup','없음',this)">없음<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn active" onclick="applyOption('syrup','헤이즐넛 1펌프',this)">헤이즐넛 1펌프<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('syrup','헤이즐넛 2펌프',this)">헤이즐넛 2펌프<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('syrup','바닐라 1펌프',this)">바닐라 1펌프<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('syrup','바닐라 2펌프',this)">바닐라 2펌프<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('syrup','카라멜 1펌프',this)">카라멜 1펌프<span class="opt-sub-check">✓</span></button>
+        </div></div><div class="opt-toggle" id="opt-milk">
+        <div class="opt-toggle-header" onclick="toggleOptOpen('milk')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">우유</span>
+            <span class="opt-toggle-val" id="optval-milk">일반</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-milk">
+          <button class="opt-sub-btn active" onclick="applyOption('milk','일반',this)">일반<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('milk','저지방',this)">저지방<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('milk','무지방',this)">무지방<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('milk','두유',this)">두유<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('milk','오트',this)">오트<span class="opt-sub-check">✓</span></button>
+        </div></div><div class="opt-toggle" id="opt-whip">
+        <div class="opt-toggle-header" onclick="toggleOptOpen('whip')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">휘핑크림</span>
+            <span class="opt-toggle-val" id="optval-whip">기본</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-whip">
+          <button class="opt-sub-btn" onclick="applyOption('whip','없음',this)">없음<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('whip','적게',this)">적게<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('whip','보통',this)">보통<span class="opt-sub-check">✓</span></button><button class="opt-sub-btn" onclick="applyOption('whip','많이',this)">많이<span class="opt-sub-check">✓</span></button>
+        </div></div></div>
+  
+      <div class="vi">
+        <div class="vi-split-left" onclick="toggleSTTPage('reorder1')">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 1a9 9 0 100 18 9 9 0 000-18zm0 16a7 7 0 110-14 7 7 0 010 14zm3-8H9V6h2v3z" fill="white"></path></svg>
+            음성으로
+          </div>
+        </div>
+        <div class="vi-split-right" onclick="goToReorder2()">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.707 5.293l-10 10a1 1 0 01-1.414 0l-5-5a1 1 0 111.414-1.414L6 13.586l9.293-9.293a1 1 0 111.414 1.414z" fill="white"></path></svg>
+            완료
+          </div>
+        </div>
+      </div>
+      <div class="talk-bubble visible" id="talk-bubble-reorder1"><span class="talk-interim">라떼</span></div>
+  
+      <div class="modal-overlay" id="close-modal-ro1" onclick="handleModalOverlayAny(event,'reorder1')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrderAny('reorder1')">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-reorder1 -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-3 Reorder2 (after edit confirm)
+    ══════════════════════════════════════ -->
+    <div id="page-reorder2" class="page">
+      <div class="fix">
+        <div class="fix-close-row">
+          <div class="close-btn" onclick="showCloseModalAny('reorder2')">
+            <span>닫기</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#565656" stroke-width="2" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+        <div class="fix-ai-row">
+          <div class="ai-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#00A862" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+          <div class="ai-text">이대로 주문할까요?  맞으면 '주문', 틀리면 '수정'이라고 말씀해 주세요!</div>
+        </div>
+      </div>
+  
+      <div class="order-card" id="reorder2-card">
+        <div class="order-card-inner">
+          <img class="order-drink-img" src="https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg" alt="음료" onerror="this.style.background='#ddd'">
+          <div class="order-info">
+            <div class="order-name-block">
+              <div class="order-name" id="ro2-name"></div>
+              <div class="order-name-en" id="ro2-en"></div>
+            </div>
+            <div class="order-options" id="ro2-options"><div class="order-opt-row"><span class="order-opt-label">HOT  |  그란데</span><span class="order-opt-price"></span></div><div class="order-opt-row"><span class="order-opt-label">에스프레소샷 기본 (1샷)</span><span class="order-opt-price">0원</span></div><div class="order-opt-row"><span class="order-opt-label">수량</span><span class="order-opt-price">1</span></div></div>
+            <div class="order-total-row"><span class="order-total" id="ro2-total">6,400원</span></div>
+          </div>
+        </div>
+      </div>
+  
+      <div class="vi">
+        <div class="vi-split-left" onclick="goToReorder()">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M14.7 6.3L13.3 4.9 10 8.19 6.7 4.9 5.3 6.3 8.59 9.6 5.3 12.9l1.4 1.4L10 11.01l3.3 3.29 1.4-1.4L11.41 9.6z" fill="white"></path><path d="M3 17h14v2H3v-2z" fill="white"></path></svg>
+            수정하기
+          </div>
+        </div>
+        <div class="vi-split-right" onclick="goToConfirm()">
+          <div class="vi-btn-label">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 2H18v14l-2-1-2 1-2-1-2 1-2-1-2 1V2zm0 18H2V6l4 2v12z" stroke="white" stroke-width="1.5" fill="none"></path></svg>
+            주문하기
+          </div>
+        </div>
+      </div>
+      <div class="talk-bubble" id="talk-bubble-reorder2"></div>
+  
+      <div class="modal-overlay" id="close-modal-ro2" onclick="handleModalOverlayAny(event,'reorder2')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <div class="modal-title">보이스 오더를 종료하시겠어요?</div>
+          <div class="modal-btns">
+            <button class="modal-btn modal-btn-cancel" onclick="continueVoiceOrderAny('reorder2')">계속하기</button>
+            <button class="modal-btn modal-btn-confirm" onclick="exitToHome()">종료하기</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-reorder2 -->
+  
+  
+    <!-- ══════════════════════════════════════
+         PAGE: 0-1-3 OptionList
+    ══════════════════════════════════════ -->
+  </div><!-- /app -->
+  
+  <script>
+  // ═══════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════
+  let currentPage = 'home';
+  let pageHistory = [];
+  
+  // [수정 1] orderState를 빈 기본값으로 초기화 - 사용자가 언급하지 않은 옵션은 기본값 유지
+  function createEmptyOrderState() {
+    return {
+      menu: '',          // 반드시 발화에서 추출
+      menuEn: '',
+      menuBase: '',      // 온도 접두사 없는 순수 메뉴 베이스명
+      temp: 'ICED',      // 아이스 아메리카노는 ICED 기본
+      size: 'Tall',
+      bean: 'Signature', // 원두 (기본: Signature)
+      water: '보통',     // 물/베이스 양 (기본: 보통)
+      shots: 2,          // Tall 기본 2샷
+      syrups: [],        // 언급 없으면 빈 배열
+      ice: '보통',       // 얼음 (기본: 보통)
+      caramelDrizzle: '', // 카라멜 드리즐 양
+      chocolateDrizzle: '', // 초콜릿 드리즐 양
+      whipping: '일반',  // 휘핑 (프라푸치노용)
+      javachip: '자바칩', // 자바칩 (프라푸치노용)
+      milk: '일반',      // 우유
+      frappuccinoSyrupType: '일반', // 프라푸치노용시럽 (기본: 일반)
+      mokaSyrupCount: 0, // 모카시럽 개수
+      vanillaSyrupCount: 0, // 바닐라시럽 개수
+      hazelnutSyrupCount: 0, // 헤이즐넛시럽 개수
+      caramelSyrupCount: 0, // 카라멜시럽 개수
+      milkTemp: '보통',  // 우유/음료 온도
+      milkFoam: '일반',  // 우유거품
+      quantity: 1,       // 수량 (1-20잔)
+      basePrice: 4700    // 카페 아메리카노 기본가
+    };
+  }
+  let orderState = createEmptyOrderState();
+  let editedOptions = new Set(); // track which options were modified
+  let selectedRecIndex = -1;
+  
+  // ═══════════════════════════════════════
+  //  MENU DATABASE (엑셀 데이터 기반)
+  // ═══════════════════════════════════════
+  // 엑셀에 존재하는 실제 메뉴 목록 (메뉴명, 온도, 기본가격) - 111개 메뉴
+  const MENU_DB = [
+    {name:'슈크림 라떼', temp:'HOT', price:6700},
+    {name:'슈크림 라떼', temp:'ICED', price:6700},
+    {name:'슈 폼 라떼', temp:'HOT', price:6700},
+    {name:'슈 폼 라떼', temp:'ICED', price:6700},
+    {name:'스타벅스 에어로카노', temp:'ICED', price:4900},
+    {name:'시그니처 코르타도', temp:'HOT', price:5800},
+    {name:'밀크카라멜 라떼', temp:'HOT', price:5800},
+    {name:'밀크카라멜 라떼', temp:'ICED', price:5800},
+    {name:'플랫 화이트', temp:'HOT', price:5800},
+    {name:'플랫 화이트', temp:'ICED', price:5800},
+    {name:'카페 아메리카노', temp:'HOT', price:4700},
+    {name:'카페 아메리카노', temp:'ICED', price:4700},
+    {name:'카페 라떼', temp:'HOT', price:5200},
+    {name:'카페 라떼', temp:'ICED', price:5200},
+    {name:'바닐라 라떼', temp:'HOT', price:5200},
+    {name:'바닐라 라떼', temp:'ICED', price:5200},
+    {name:'스타벅스 돌체 라떼', temp:'HOT', price:6100},
+    {name:'스타벅스 돌체 라떼', temp:'ICED', price:6100},
+    {name:'카페 모카', temp:'HOT', price:5700},
+    {name:'카페 모카', temp:'ICED', price:5700},
+    {name:'카푸치노', temp:'HOT', price:5200},
+    {name:'카푸치노', temp:'ICED', price:5200},
+    {name:'카라멜 마끼아또', temp:'HOT', price:6100},
+    {name:'카라멜 마끼아또', temp:'ICED', price:6100},
+    {name:'화이트 초콜릿 모카', temp:'HOT', price:6100},
+    {name:'화이트 초콜릿 모카', temp:'ICED', price:6100},
+    {name:'커피 스타벅스 더블 샷', temp:'ICED', price:5300},
+    {name:'바닐라 스타벅스 더블 샷', temp:'ICED', price:5300},
+    {name:'헤이즐넛 스타벅스 더블 샷', temp:'ICED', price:5300},
+    {name:'에스프레소', temp:'HOT', price:3900},
+    {name:'에스프레소 마끼아또', temp:'HOT', price:3900},
+    {name:'에스프레소 콘 파나', temp:'HOT', price:4100},
+    {name:'우디 카우보이 쿠키 콜드브루', temp:'ICED', price:6900},
+    {name:'바닐라 아인슈페너 콜드브루', temp:'ICED', price:6100},
+    {name:'프렌치 바닐라 콜드브루', temp:'ICED', price:6300},
+    {name:'바닐라 크림 콜드브루', temp:'ICED', price:6000},
+    {name:'돌체 콜드브루', temp:'ICED', price:6000},
+    {name:'콜드브루', temp:'ICED', price:5100},
+    {name:'베르가못 콜드브루', temp:'ICED', price:6000},
+    {name:'오트 콜드브루', temp:'ICED', price:6000},
+    {name:'스위트 밀크 커피', temp:'ICED', price:5700},
+    {name:'브루드 커피', temp:'HOT', price:4500},
+    {name:'브루드 커피', temp:'ICED', price:4500},
+    {name:'제시 슈트로베리 프라푸치노', temp:'ICED', price:6700},
+    {name:'레드빈 빙수 블렌디드', temp:'ICED', price:8300},
+    {name:'애플망고 빙수 블렌디드', temp:'ICED', price:8300},
+    {name:'자몽 허니 블렌디드', temp:'ICED', price:6300},
+    {name:'더블 에스프레소 칩 블렌디드', temp:'ICED', price:6500},
+    {name:'제주 말차 크림 프라푸치노', temp:'ICED', price:6500},
+    {name:'자바 칩 프라푸치노', temp:'ICED', price:6500},
+    {name:'딸기 딜라이트 요거트 블렌디드', temp:'ICED', price:6500},
+    {name:'망고 바나나 블렌디드', temp:'ICED', price:6600},
+    {name:'초콜릿 크림 칩 프라푸치노', temp:'ICED', price:6200},
+    {name:'카라멜 프라푸치노', temp:'ICED', price:6100},
+    {name:'에스프레소 프라푸치노', temp:'ICED', price:5700},
+    {name:'망고 패션프루트 블렌디드', temp:'ICED', price:5600},
+    {name:'아이스 슈크림 말차 라떼', temp:'ICED', price:6700},
+    {name:'아이스 슈 폼 말차 라떼', temp:'ICED', price:6700},
+    {name:'아이스 얼그레이 바닐라 티 라떼', temp:'ICED', price:6100},
+    {name:'복숭아 아이스티', temp:'ICED', price:6100},
+    {name:'아이스 스타벅스 클래식 밀크 티', temp:'ICED', price:6100},
+    {name:'스타벅스 클래식 밀크 티 보틀', temp:'ICED', price:13400},
+    {name:'아이스 제주 말차 라떼', temp:'ICED', price:6100},
+    {name:'아이스 유자 민트 티', temp:'ICED', price:6100},
+    {name:'아이스 자몽 허니 블랙 티', temp:'ICED', price:5900},
+    {name:'아이스 제주 유기농 녹차로 만든 티', temp:'ICED', price:5300},
+    {name:'아이스 잉글리쉬 브렉퍼스트 티', temp:'ICED', price:4500},
+    {name:'아이스 얼그레이 티', temp:'ICED', price:4500},
+    {name:'아이스 유스베리 티', temp:'ICED', price:4500},
+    {name:'아이스 히비스커스 티', temp:'ICED', price:4500},
+    {name:'아이스 민트 블렌드 티', temp:'ICED', price:4500},
+    {name:'아이스 캐모마일 블렌드 티', temp:'ICED', price:4500},
+    {name:'버즈 키위 팝 에너지 피지오 ', temp:'ICED', price:6700},
+    {name:'쿨 라임 피지오', temp:'ICED', price:6100},
+    {name:'피치 딸기 피지오', temp:'ICED', price:6100},
+    {name:'체리&자두 에너지 피지오', temp:'ICED', price:6300},
+    {name:'스타벅스 딸기 라떼', temp:'ICED', price:6500},
+    {name:'아이스 시그니처 초콜릿', temp:'ICED', price:5900},
+    {name:'스팀 우유', temp:'HOT', price:4100},
+    {name:'우유', temp:'ICED', price:4100},
+    {name:'수박 주스 190ML', temp:'-', price:4500},
+    {name:'스퀴즈드 오렌지 주스190ML', temp:'-', price:3800},
+    {name:'딸기주스 190ML', temp:'-', price:4500},
+    {name:'유기농 오렌지 100% 주스 190ML', temp:'-', price:4900},
+    {name:'딸기 가득 요거트 190ML', temp:'-', price:4100},
+    {name:'햇사과 주스 190ML', temp:'-', price:4700},
+    {name:'망고주스 190ML', temp:'-', price:4700},
+    {name:'케일&사과주스 190ML', temp:'-', price:4000},
+    {name:'한라봉주스 190ML', temp:'-', price:4700},
+    {name:'블루베리 요거트 190ML', temp:'-', price:4500},
+    {name:'ABC 클렌즈 190ML', temp:'-', price:4700},
+    {name:'케일 클렌즈  190ML', temp:'-', price:4700},
+    {name:'에비앙 500ML', temp:'-', price:3300},
+    {name:'에비앙 스파클링 330ML', temp:'-', price:3800},
+    {name:'발라딘 콜라 330ML', temp:'-', price:4700},
+    {name:'유기농 스파클링 애플 주스 296ML', temp:'-', price:4800},
+    {name:'슈크림 말차 라떼', temp:'HOT', price:6700},
+    {name:'슈 폼 말차 라떼', temp:'HOT', price:6700},
+    {name:'얼그레이 바닐라 티 라떼', temp:'HOT', price:6100},
+    {name:'복숭아 핫 티', temp:'HOT', price:6100},
+    {name:'스타벅스 클래식 밀크 티', temp:'HOT', price:6100},
+    {name:'제주 말차 라떼', temp:'HOT', price:6100},
+    {name:'유자 민트 티', temp:'HOT', price:6100},
+    {name:'자몽 허니 블랙 티', temp:'HOT', price:5900},
+    {name:'제주 유기농 녹차로 만든 티', temp:'HOT', price:5300},
+    {name:'잉글리쉬 브렉퍼스트 티', temp:'HOT', price:4500},
+    {name:'얼그레이 티', temp:'HOT', price:4500},
+    {name:'유스베리 티', temp:'HOT', price:4500},
+    {name:'히비스커스 티', temp:'HOT', price:4500},
+    {name:'민트 블렌드 티', temp:'HOT', price:4500},
+    {name:'캐모마일 블렌드 티', temp:'HOT', price:4500},
+  ];
+  
+  // 음성 인식용 메뉴 키워드 매핑 (발화 키워드 → 메뉴 베이스명)
+  const MENU_KEYWORD_MAP = [
+    // 에스프레소 음료
+    { keywords:['슈크림 라떼','슈크림라떼'], base:'슈크림 라떼', temps:['HOT','ICED'],
+      hotName:'슈크림 라떼', icedName:'슈크림 라떼', hotPrice:6700, icedPrice:6700 },
+    { keywords:['슈 폼 라떼','슈폼라떼'], base:'슈 폼 라떼', temps:['HOT','ICED'],
+      hotName:'슈 폼 라떼', icedName:'슈 폼 라떼', hotPrice:6700, icedPrice:6700 },
+    { keywords:['스타벅스 에어로카노','에어로카노'], base:'스타벅스 에어로카노', temps:['ICED'], price:4900 },
+    { keywords:['시그니처 코르타도','코르타도'], base:'시그니처 코르타도', temps:['HOT'], price:5800 },
+    { keywords:['밀크 카라멜 라떼','밀크카라멜라떼','카라멜 라떼','카라멜라떼'], base:'밀크카라멜 라떼', temps:['HOT','ICED'],
+      hotName:'밀크카라멜 라떼', icedName:'밀크카라멜 라떼', hotPrice:5800, icedPrice:5800 },
+    { keywords:['플랫 화이트','플랫화이트'], base:'플랫 화이트', temps:['HOT','ICED'],
+      hotName:'플랫 화이트', icedName:'플랫 화이트', hotPrice:5800, icedPrice:5800 },
+    { keywords:['카페 아메리카노','아메리카노','아메','아메리','에스프레소'], base:'카페 아메리카노', temps:['HOT','ICED'],
+      hotName:'카페 아메리카노', icedName:'카페 아메리카노', hotPrice:4700, icedPrice:4700 },
+    { keywords:['카페 라떼','라떼','카페라떼'], base:'카페 라떼', temps:['HOT','ICED'],
+      hotName:'카페 라떼', icedName:'카페 라떼', hotPrice:5200, icedPrice:5200 },
+    { keywords:['바닐라 라떼','바닐라라떼'], base:'바닐라 라떼', temps:['HOT','ICED'],
+      hotName:'바닐라 라떼', icedName:'바닐라 라떼', hotPrice:5200, icedPrice:5200 },
+    { keywords:['스타벅스 돌체 라떼','돌체 라떼','돌체라떼','돌체'], base:'스타벅스 돌체 라떼', temps:['HOT','ICED'],
+      hotName:'스타벅스 돌체 라떼', icedName:'스타벅스 돌체 라떼', hotPrice:6100, icedPrice:6100 },
+    { keywords:['카페 모카','모카','카페모카'], base:'카페 모카', temps:['HOT','ICED'],
+      hotName:'카페 모카', icedName:'카페 모카', hotPrice:5700, icedPrice:5700 },
+    { keywords:['카푸치노','카푸'], base:'카푸치노', temps:['HOT','ICED'],
+      hotName:'카푸치노', icedName:'카푸치노', hotPrice:5200, icedPrice:5200 },
+    { keywords:['카라멜 마끼아또','카라멜마끼아또','마끼아또'], base:'카라멜 마끼아또', temps:['HOT','ICED'],
+      hotName:'카라멜 마끼아또', icedName:'카라멜 마끼아또', hotPrice:6100, icedPrice:6100 },
+    { keywords:['화이트 초콜릿 모카','화이트초콜릿','화이트 모카'], base:'화이트 초콜릿 모카', temps:['HOT','ICED'],
+      hotName:'화이트 초콜릿 모카', icedName:'화이트 초콜릿 모카', hotPrice:6100, icedPrice:6100 },
+    { keywords:['커피 스타벅스 더블 샷','더블 샷','더블샷','커피 더블'], base:'커피 스타벅스 더블 샷', temps:['ICED'], price:5300 },
+    { keywords:['바닐라 스타벅스 더블 샷','바닐라 더블','바닐라 더블 샷'], base:'바닐라 스타벅스 더블 샷', temps:['ICED'], price:5300 },
+    { keywords:['헤이즐넛 스타벅스 더블 샷','헤이즐넛 더블','헤이즐넛'], base:'헤이즐넛 스타벅스 더블 샷', temps:['ICED'], price:5300 },
+    { keywords:['에스프레소','에스프레','에스'], base:'에스프레소', temps:['HOT'], price:3900 },
+    { keywords:['에스프레소 마끼아또','에스프레소마끼아또'], base:'에스프레소 마끼아또', temps:['HOT'], price:3900 },
+    { keywords:['에스프레소 콘 파나','콘 파나'], base:'에스프레소 콘 파나', temps:['HOT'], price:4100 },
+
+    // 콜드브루
+    { keywords:['우디 카우보이 쿠키 콜드브루','우디 카우보이','우디 쿠키'], base:'우디 카우보이 쿠키 콜드브루', temps:['ICED'], price:6900 },
+    { keywords:['바닐라 아인슈페너 콜드브루','아인슈페너 콜드브루','아인슈페너'], base:'바닐라 아인슈페너 콜드브루', temps:['ICED'], price:6100 },
+    { keywords:['프렌치 바닐라 콜드브루','프렌치 바닐라','프렌치 콜드브루'], base:'프렌치 바닐라 콜드브루', temps:['ICED'], price:6300 },
+    { keywords:['바닐라 크림 콜드브루','바닐라 크림','크림 콜드브루'], base:'바닐라 크림 콜드브루', temps:['ICED'], price:6000 },
+    { keywords:['돌체 콜드브루','돌체 콜드'], base:'돌체 콜드브루', temps:['ICED'], price:6000 },
+    { keywords:['콜드브루','콜드브','콜드'], base:'콜드브루', temps:['ICED'], price:5100 },
+    { keywords:['베르가못 콜드브루','베르가못'], base:'베르가못 콜드브루', temps:['ICED'], price:6000 },
+    { keywords:['오트 콜드브루','오트 콜드','오트'], base:'오트 콜드브루', temps:['ICED'], price:6000 },
+
+    // 기타 커피
+    { keywords:['스위트 밀크 커피','스위트 밀크','스위트 커피'], base:'스위트 밀크 커피', temps:['ICED'], price:5700 },
+    { keywords:['브루드 커피','브루드'], base:'브루드 커피', temps:['HOT','ICED'],
+      hotName:'브루드 커피', icedName:'브루드 커피', hotPrice:4500, icedPrice:4500 },
+
+    // 프라푸치노/블렌디드
+    { keywords:['제시 슈트로베리 프라푸치노','슈트로베리','딸기 프라푸','딸기프라푸'], base:'제시 슈트로베리 프라푸치노', temps:['ICED'], price:6700 },
+    { keywords:['레드빈 빙수 블렌디드','레드빈','팥 빙수'], base:'레드빈 빙수 블렌디드', temps:['ICED'], price:8300 },
+    { keywords:['애플망고 빙수 블렌디드','애플망고','망고 빙수'], base:'애플망고 빙수 블렌디드', temps:['ICED'], price:8300 },
+    { keywords:['자몽 허니 블렌디드','자몽 허니','자몽 블렌'], base:'자몽 허니 블렌디드', temps:['ICED'], price:6300 },
+    { keywords:['더블 에스프레소 칩 블렌디드','에스프레소 칩','더블 칩'], base:'더블 에스프레소 칩 블렌디드', temps:['ICED'], price:6500 },
+    { keywords:['제주 말차 크림 프라푸치노','제주 말차','말차 프라푸','말차 크림'], base:'제주 말차 크림 프라푸치노', temps:['ICED'], price:6500 },
+    { keywords:['자바 칩 프라푸치노','자바 칩 프라푸','자바칩 프라푸','자바칩','자바 칩','자바칩프라푸치노','프라푸치노','프라푸','프라프','잡아칩','잡았지','자바치','자밫','자바','칩','자밥','자밫칩','자바칩프라푸'], base:'자바 칩 프라푸치노', temps:['ICED'], price:6500 },
+    { keywords:['딸기 딜라이트 요거트 블렌디드','딸기 딜라이트','딜라이트'], base:'딸기 딜라이트 요거트 블렌디드', temps:['ICED'], price:6500 },
+    { keywords:['망고 바나나 블렌디드','망고 바나나','바나나 블렌'], base:'망고 바나나 블렌디드', temps:['ICED'], price:6600 },
+    { keywords:['초콜릿 크림 칩 프라푸치노','초콜릿 칩','크림 칩'], base:'초콜릿 크림 칩 프라푸치노', temps:['ICED'], price:6200 },
+    { keywords:['카라멜 프라푸치노','카라멜 프라푸'], base:'카라멜 프라푸치노', temps:['ICED'], price:6100 },
+    { keywords:['에스프레소 프라푸치노','에스프레소 프라푸'], base:'에스프레소 프라푸치노', temps:['ICED'], price:5700 },
+    { keywords:['망고 패션프루트 블렌디드','망고 패션','패션프루트'], base:'망고 패션프루트 블렌디드', temps:['ICED'], price:5600 },
+
+    // 말차 음료
+    { keywords:['슈크림 말차 라떼','슈크림 말차','슈크림 말차 라떼'], base:'슈크림 말차 라떼', temps:['HOT','ICED'],
+      hotName:'슈크림 말차 라떼', icedName:'아이스 슈크림 말차 라떼', hotPrice:6700, icedPrice:6700 },
+    { keywords:['슈 폼 말차 라떼','슈 폼 말차','슈폼 말차'], base:'슈 폼 말차 라떼', temps:['HOT','ICED'],
+      hotName:'슈 폼 말차 라떼', icedName:'아이스 슈 폼 말차 라떼', hotPrice:6700, icedPrice:6700 },
+    { keywords:['얼그레이 바닐라 티 라떼','얼그레이 바닐라','얼그레이 라떼'], base:'얼그레이 바닐라 티 라떼', temps:['HOT','ICED'],
+      hotName:'얼그레이 바닐라 티 라떼', icedName:'아이스 얼그레이 바닐라 티 라떼', hotPrice:6100, icedPrice:6100 },
+    { keywords:['복숭아 핫 티','복숭아 티','복숭아'], base:'복숭아 핫 티', temps:['HOT','ICED'],
+      hotName:'복숭아 핫 티', icedName:'복숭아 아이스티', hotPrice:6100, icedPrice:6100 },
+    { keywords:['스타벅스 클래식 밀크 티','클래식 밀크 티','클래식 티','밀크 티'], base:'스타벅스 클래식 밀크 티', temps:['HOT','ICED'],
+      hotName:'스타벅스 클래식 밀크 티', icedName:'아이스 스타벅스 클래식 밀크 티', hotPrice:6100, icedPrice:6100 },
+    { keywords:['제주 말차 라떼','제주 말차','말차'], base:'제주 말차 라떼', temps:['HOT','ICED'],
+      hotName:'제주 말차 라떼', icedName:'아이스 제주 말차 라떼', hotPrice:6100, icedPrice:6100 },
+    { keywords:['유자 민트 티','유자 민트','유자'], base:'유자 민트 티', temps:['HOT','ICED'],
+      hotName:'유자 민트 티', icedName:'아이스 유자 민트 티', hotPrice:6100, icedPrice:6100 },
+    { keywords:['자몽 허니 블랙 티','자몽 허니','자몽 블랙'], base:'자몽 허니 블랙 티', temps:['HOT','ICED'],
+      hotName:'자몽 허니 블랙 티', icedName:'아이스 자몽 허니 블랙 티', hotPrice:5900, icedPrice:5900 },
+    { keywords:['제주 유기농 녹차로 만든 티','녹차','유기농 녹차','제주 녹차'], base:'제주 유기농 녹차로 만든 티', temps:['HOT','ICED'],
+      hotName:'제주 유기농 녹차로 만든 티', icedName:'아이스 제주 유기농 녹차로 만든 티', hotPrice:5300, icedPrice:5300 },
+    { keywords:['잉글리쉬 브렉퍼스트 티','브렉퍼스트'], base:'잉글리쉬 브렉퍼스트 티', temps:['HOT','ICED'],
+      hotName:'잉글리쉬 브렉퍼스트 티', icedName:'아이스 잉글리쉬 브렉퍼스트 티', hotPrice:4500, icedPrice:4500 },
+    { keywords:['얼그레이 티','얼그레이'], base:'얼그레이 티', temps:['HOT','ICED'],
+      hotName:'얼그레이 티', icedName:'아이스 얼그레이 티', hotPrice:4500, icedPrice:4500 },
+    { keywords:['유스베리 티','유스베리'], base:'유스베리 티', temps:['HOT','ICED'],
+      hotName:'유스베리 티', icedName:'아이스 유스베리 티', hotPrice:4500, icedPrice:4500 },
+    { keywords:['히비스커스 티','히비스커스'], base:'히비스커스 티', temps:['HOT','ICED'],
+      hotName:'히비스커스 티', icedName:'아이스 히비스커스 티', hotPrice:4500, icedPrice:4500 },
+    { keywords:['민트 블렌드 티','민트 블렌드','민트'], base:'민트 블렌드 티', temps:['HOT','ICED'],
+      hotName:'민트 블렌드 티', icedName:'아이스 민트 블렌드 티', hotPrice:4500, icedPrice:4500 },
+    { keywords:['캐모마일 블렌드 티','캐모마일','케모마일'], base:'캐모마일 블렌드 티', temps:['HOT','ICED'],
+      hotName:'캐모마일 블렌드 티', icedName:'아이스 캐모마일 블렌드 티', hotPrice:4500, icedPrice:4500 },
+
+    // Fizios
+    { keywords:['버즈 키위 팝 에너지 피지오','버즈 키위','키위 피지오'], base:'버즈 키위 팝 에너지 피지오', temps:['ICED'], price:6700 },
+    { keywords:['쿨 라임 피지오','쿨 라임','라임 피지오'], base:'쿨 라임 피지오', temps:['ICED'], price:6100 },
+    { keywords:['피치 딸기 피지오','피치 딸기','딸기 피지오'], base:'피치 딸기 피지오', temps:['ICED'], price:6100 },
+    { keywords:['체리&자두 에너지 피지오','체리 자두','에너지 피지오'], base:'체리&자두 에너지 피지오', temps:['ICED'], price:6300 },
+
+    // 기타 음료
+    { keywords:['스타벅스 딸기 라떼','딸기 라떼','딸기'], base:'스타벅스 딸기 라떼', temps:['ICED'], price:6500 },
+    { keywords:['아이스 시그니처 초콜릿','시그니처 초콜릿','초콜릿'], base:'아이스 시그니처 초콜릿', temps:['ICED'], price:5900 },
+    { keywords:['스팀 우유','스팀','우유'], base:'스팀 우유', temps:['HOT'], price:4100 },
+    { keywords:['우유'], base:'우유', temps:['ICED'], price:4100 },
+
+    // 주스/음료
+    { keywords:['수박 주스','수박'], base:'수박 주스 190ML', temps:['-'], price:4500 },
+    { keywords:['스퀴즈드 오렌지 주스','오렌지 주스','오렌지'], base:'스퀴즈드 오렌지 주스190ML', temps:['-'], price:3800 },
+    { keywords:['딸기주스','딸기 주스'], base:'딸기주스 190ML', temps:['-'], price:4500 },
+    { keywords:['유기농 오렌지 100% 주스','유기농 오렌지'], base:'유기농 오렌지 100% 주스 190ML', temps:['-'], price:4900 },
+    { keywords:['딸기 가득 요거트','딸기 요거트'], base:'딸기 가득 요거트 190ML', temps:['-'], price:4100 },
+    { keywords:['햇사과 주스','사과 주스','사과'], base:'햇사과 주스 190ML', temps:['-'], price:4700 },
+    { keywords:['망고주스','망고 주스','망고'], base:'망고주스 190ML', temps:['-'], price:4700 },
+    { keywords:['케일&사과주스','케일 사과','케일'], base:'케일&사과주스 190ML', temps:['-'], price:4000 },
+    { keywords:['한라봉주스','한라봉'], base:'한라봉주스 190ML', temps:['-'], price:4700 },
+    { keywords:['블루베리 요거트','블루베리'], base:'블루베리 요거트 190ML', temps:['-'], price:4500 },
+    { keywords:['ABC 클렌즈','ABC'], base:'ABC 클렌즈 190ML', temps:['-'], price:4700 },
+    { keywords:['케일 클렌즈','클렌즈'], base:'케일 클렌즈  190ML', temps:['-'], price:4700 },
+    { keywords:['에비앙 500ML','에비앙'], base:'에비앙 500ML', temps:['-'], price:3300 },
+    { keywords:['에비앙 스파클링','스파클링','스파클링 물'], base:'에비앙 스파클링 330ML', temps:['-'], price:3800 },
+    { keywords:['발라딘 콜라','콜라'], base:'발라딘 콜라 330ML', temps:['-'], price:4700 },
+    { keywords:['유기농 스파클링 애플 주스','스파클링 애플'], base:'유기농 스파클링 애플 주스 296ML', temps:['-'], price:4800 },
+    { keywords:['스타벅스 클래식 밀크 티 보틀','보틀'], base:'스타벅스 클래식 밀크 티 보틀', temps:['ICED'], price:13400 },
+  ];
+
+  // 메뉴별 이미지 매핑 (엑셀 데이터 기반)
+  const MENU_IMAGE_MAP = {
+    '슈크림 라떼': {'HOT':'https://i.postimg.cc/mZFK84fB/syukeulim-latte-(HOT).jpg','ICED':'https://i.postimg.cc/B6ZHt4Tv/syukeulim-latte-(ICED).jpg'},
+    '슈 폼 라떼': {'HOT':'https://i.postimg.cc/ryPxF6KF/syu-pom-latte-(HOT).jpg','ICED':'https://i.postimg.cc/L8dPLztb/syu-pom-latte-(ICED).jpg'},
+    '스타벅스 에어로카노': {'ICED':'https://i.postimg.cc/7hGCT6bW/seutabeogseu-eeolokano.jpg'},
+    '시그니처 코르타도': {'HOT':'https://i.postimg.cc/X75GjpRp/sigeunicheo-koleutado.jpg'},
+    '밀크카라멜 라떼': {'HOT':'https://i.postimg.cc/rpVKNgKS/milkeukalamel-latte-(HOT).jpg','ICED':'https://i.postimg.cc/NMLFWM8r/milkeukalamel-latte-(ICED).jpg'},
+    '플랫 화이트': {'HOT':'https://i.postimg.cc/XqCJYzzp/peullaes-hwaiteu-(HOT).jpg','ICED':'https://i.postimg.cc/gcQNJt0N/peullaes-hwaiteu-(ICED).jpg'},
+    '카페 아메리카노': {'HOT':'https://i.postimg.cc/xTmgbGJv/kape-amelikano-(HOT).jpg','ICED':'https://i.postimg.cc/t4t5BXzs/kape-amelikano-(ICED).jpg'},
+    '카페 라떼': {'HOT':'https://i.postimg.cc/wBwkd0PC/kape-latte-(HOT).jpg','ICED':'https://i.postimg.cc/ZRgFW0Jj/kape-latte-(ICED).jpg'},
+    '바닐라 라떼': {'HOT':'https://i.postimg.cc/d0gLdCTk/banilla-latte-(HOT).jpg','ICED':'https://i.postimg.cc/ZnxR1Dsb/banilla-latte-(ICED).jpg'},
+    '스타벅스 돌체 라떼': {'HOT':'https://i.postimg.cc/hPNN7bDg/seutabeogseu-dolche-latte-(HOT).jpg','ICED':'https://i.postimg.cc/T1pHKhF4/seutabeogseu-dolche-latte-(ICED).jpg'},
+    '카페 모카': {'HOT':'https://i.postimg.cc/wBgfhwSd/kape-moka-(HOT).jpg','ICED':'https://i.postimg.cc/wMy06Zsv/kape-moka-(ICED).jpg'},
+    '카푸치노': {'HOT':'https://i.postimg.cc/2SDRKFP5/kapuchino-(HOT).jpg','ICED':'https://i.postimg.cc/3wtsWMWk/kapuchino-(ICED).jpg'},
+    '카라멜 마끼아또': {'HOT':'https://i.postimg.cc/Wz0jd9QB/kalamel-makkiatto-(HOT).jpg','ICED':'https://i.postimg.cc/DydnFMQD/kalamel-makkiatto-(ICED).jpg'},
+    '화이트 초콜릿 모카': {'HOT':'https://i.postimg.cc/2ydRk1W4/hwaiteu-chokollis-moka-(HOT).jpg','ICED':'https://i.postimg.cc/pLcNLbmK/hwaiteu-chokollis-moka-(ICED).jpg'},
+    '커피 스타벅스 더블 샷': {'ICED':'https://i.postimg.cc/gkG1ykRs/keopi-seutabeogseu-deobeul-syas.jpg'},
+    '바닐라 스타벅스 더블 샷': {'ICED':'https://i.postimg.cc/nL9WVsbZ/banilla-seutabeogseu-deobeul-syas.jpg'},
+    '헤이즐넛 스타벅스 더블 샷': {'ICED':'https://i.postimg.cc/HnzZvX52/heijeulneos-seutabeogseu-deobeul-syas.jpg'},
+    '에스프레소': {'HOT':'https://i.postimg.cc/sXRTVw4L/eseupeuleso.jpg'},
+    '에스프레소 마끼아또': {'HOT':'https://i.postimg.cc/dQ65YRkC/eseupeuleso-makkiatto.jpg'},
+    '에스프레소 콘 파나': {'HOT':'https://i.postimg.cc/jjyhkyYS/eseupeuleso-kon-pana.jpg'},
+    '우디 카우보이 쿠키 콜드브루': {'ICED':'https://i.postimg.cc/wjm57DvF/udi-kauboi-kuki-koldeubeulu.jpg'},
+    '바닐라 아인슈페너 콜드브루': {'ICED':'https://i.postimg.cc/R01cT9wH/banilla-ainsyupeneo-koldeubeulu.jpg'},
+    '프렌치 바닐라 콜드브루': {'ICED':'https://i.postimg.cc/TwRn7S9R/peulenchi-banilla-koldeubeulu.jpg'},
+    '바닐라 크림 콜드브루': {'ICED':'https://i.postimg.cc/J0FJhhWn/banilla-keulim-koldeubeulu.jpg'},
+    '돌체 콜드브루': {'ICED':'https://i.postimg.cc/28qhKn4f/dolche-koldeubeulu.jpg'},
+    '콜드브루': {'ICED':'https://i.postimg.cc/bwkbz8C6/koldeubeulu.jpg'},
+    '베르가못 콜드브루': {'ICED':'https://i.postimg.cc/bJN2HnzL/beleugamos-koldeubeulu.jpg'},
+    '오트 콜드브루': {'ICED':'https://i.postimg.cc/bJCS6vrH/oteu-koldeubeulu.jpg'},
+    '스위트 밀크 커피': {'ICED':'https://i.postimg.cc/VLb0Rm8L/seuwiteu-milkeu-keopi.jpg'},
+    '브루드 커피': {'HOT':'https://i.postimg.cc/633yGNc9/beuludeu-keopi-(HOT).jpg','ICED':'https://i.postimg.cc/J0H0PcSF/beuludeu-keopi-(ICED).jpg'},
+    '자바 칩 프라푸치노': {'ICED':'https://i.postimg.cc/2yN0p88W/jaba-chib-peulapuchino.jpg'},
+    '제시 슈트로베리 프라푸치노': {'ICED':'https://i.postimg.cc/rwWnBZY9/strawberry-frappuccino.jpg'},
+    '카라멜 프라푸치노': {'ICED':'https://i.postimg.cc/GhKZYnXK/caramel-frappuccino.jpg'},
+    '초콜릿 크림 칩 프라푸치노': {'ICED':'https://i.postimg.cc/7pcBKb5P/chocolate-chip-frappuccino.jpg'},
+    '에스프레소 프라푸치노': {'ICED':'https://i.postimg.cc/1zmVMkJj/espresso-frappuccino.jpg'},
+    '더블 에스프레소 칩 블렌디드': {'ICED':'https://i.postimg.cc/FsZwMm9X/double-espresso-chip-blended.jpg'},
+    '제주 말차 크림 프라푸치노': {'ICED':'https://i.postimg.cc/h4NhQx6v/jeju-matcha-cream-frappuccino.jpg'},
+    '딸기 딜라이트 요거트 블렌디드': {'ICED':'https://i.postimg.cc/X52gQN2k/strawberry-delight-yogurt-blended.jpg'},
+    '망고 바나나 블렌디드': {'ICED':'https://i.postimg.cc/wBhVQy8n/mango-banana-blended.jpg'},
+    '망고 패션프루트 블렌디드': {'ICED':'https://i.postimg.cc/3R5Zb8gV/mango-passionfruit-blended.jpg'},
+    '자몽 허니 블렌디드': {'ICED':'https://i.postimg.cc/wM7BGpNq/grapefruit-honey-blended.jpg'},
+    '레드빈 빙수 블렌디드': {'ICED':'https://i.postimg.cc/B6GVyKFy/red-bean-bingsu-blended.jpg'},
+    '애플망고 빙수 블렌디드': {'ICED':'https://i.postimg.cc/4d9b6h5x/apple-mango-bingsu-blended.jpg'},
+    '아이스 슈크림 말차 라떼': {'ICED':'https://i.postimg.cc/QdCKqvJm/ice-cream-matcha-latte.jpg'},
+    '아이스 슈 폼 말차 라떼': {'ICED':'https://i.postimg.cc/3R1gQMCv/ice-foam-matcha-latte.jpg'},
+    '아이스 얼그레이 바닐라 티 라떼': {'ICED':'https://i.postimg.cc/fR3kNZ6g/ice-earls-vanilla-tea-latte.jpg'},
+    '복숭아 아이스티': {'ICED':'https://i.postimg.cc/GhYCgJMj/peach-iced-tea.jpg'},
+    '아이스 스타벅스 클래식 밀크 티': {'ICED':'https://i.postimg.cc/YVKH7fRj/ice-classic-milk-tea.jpg'},
+    '스타벅스 딸기 라떼': {'ICED':'https://i.postimg.cc/t4Y3nXvM/strawberry-latte.jpg'},
+    '아이스 제주 말차 라떼': {'ICED':'https://i.postimg.cc/X5B2kYdq/ice-jeju-matcha-latte.jpg'},
+    '아이스 유자 민트 티': {'ICED':'https://i.postimg.cc/8cDnW3Mq/ice-yuzu-mint-tea.jpg'},
+    '아이스 자몽 허니 블랙 티': {'ICED':'https://i.postimg.cc/CK2VLFg9/ice-grapefruit-honey-black-tea.jpg'},
+    '아이스 제주 유기농 녹차로 만든 티': {'ICED':'https://i.postimg.cc/7YWVvNqR/ice-jeju-green-tea.jpg'},
+    '아이스 잉글리쉬 브렉퍼스트 티': {'ICED':'https://i.postimg.cc/j5h7HV2G/ice-english-breakfast-tea.jpg'},
+    '아이스 얼그레이 티': {'ICED':'https://i.postimg.cc/3wp5bLNz/ice-earls-tea.jpg'},
+    '아이스 유스베리 티': {'ICED':'https://i.postimg.cc/BnS8FFVq/ice-usberry-tea.jpg'},
+    '아이스 히비스커스 티': {'ICED':'https://i.postimg.cc/bJQVGLy4/ice-hibiscus-tea.jpg'},
+    '아이스 민트 블렌드 티': {'ICED':'https://i.postimg.cc/SKy3g8Qs/ice-mint-blend-tea.jpg'},
+    '아이스 캐모마일 블렌드 티': {'ICED':'https://i.postimg.cc/3zNzKQPL/ice-chamomile-blend-tea.jpg'},
+    '버즈 키위 팝 에너지 피지오': {'ICED':'https://i.postimg.cc/QMwNdBRb/buzz-kiwi-pop-energy.jpg'},
+    '쿨 라임 피지오': {'ICED':'https://i.postimg.cc/7RFvx43J/cool-lime-physio.jpg'},
+    '피치 딸기 피지오': {'ICED':'https://i.postimg.cc/5NHf7WXK/peach-strawberry-physio.jpg'},
+    '체리&자두 에너지 피지오': {'ICED':'https://i.postimg.cc/zfkxqTqQ/cherry-plum-energy-physio.jpg'},
+    '아이스 시그니처 초콜릿': {'ICED':'https://i.postimg.cc/jSRRF8hX/ice-signature-chocolate.jpg'},
+    '스팀 우유': {'HOT':'https://i.postimg.cc/kGFLNh2v/steamed-milk.jpg'},
+    '우유': {'ICED':'https://i.postimg.cc/kGgqBZxR/milk.jpg'},
+    '슈크림 말차 라떼': {'HOT':'https://i.postimg.cc/25MFsJyB/cream-matcha-latte-hot.jpg'},
+    '슈 폼 말차 라떼': {'HOT':'https://i.postimg.cc/7YZVkMfC/foam-matcha-latte-hot.jpg'},
+    '얼그레이 바닐라 티 라떼': {'HOT':'https://i.postimg.cc/K8B7HVYt/earls-vanilla-tea-latte-hot.jpg'},
+    '복숭아 핫 티': {'HOT':'https://i.postimg.cc/8cBBkLYG/peach-hot-tea.jpg'},
+    '스타벅스 클래식 밀크 티': {'HOT':'https://i.postimg.cc/mDVsG3RX/classic-milk-tea-hot.jpg'},
+    '제주 말차 라떼': {'HOT':'https://i.postimg.cc/44xFBkBv/jeju-matcha-latte-hot.jpg'},
+    '유자 민트 티': {'HOT':'https://i.postimg.cc/GphqLVKy/yuzu-mint-tea-hot.jpg'},
+    '자몽 허니 블랙 티': {'HOT':'https://i.postimg.cc/44h3kVZY/grapefruit-honey-black-tea-hot.jpg'},
+    '제주 유기농 녹차로 만든 티': {'HOT':'https://i.postimg.cc/Dyv7Sv4f/jeju-green-tea-hot.jpg'},
+    '잉글리쉬 브렉퍼스트 티': {'HOT':'https://i.postimg.cc/j5sPXGZy/english-breakfast-tea-hot.jpg'},
+    '얼그레이 티': {'HOT':'https://i.postimg.cc/Dw5JHMfV/earls-tea-hot.jpg'},
+    '유스베리 티': {'HOT':'https://i.postimg.cc/d0L7XkHP/usberry-tea-hot.jpg'},
+    '히비스커스 티': {'HOT':'https://i.postimg.cc/5cBzxp7g/hibiscus-tea-hot.jpg'},
+    '민트 블렌드 티': {'HOT':'https://i.postimg.cc/sgmQKGBh/mint-blend-tea-hot.jpg'},
+    '캐모마일 블렌드 티': {'HOT':'https://i.postimg.cc/9X2hTJ5K/chamomile-blend-tea-hot.jpg'},
+  };
+
+  function updateDrinkImage() {
+    const menuName = orderState.menu;
+    const temp = orderState.temp;
+    const imageUrl = MENU_IMAGE_MAP[menuName]?.[temp];
+    if(imageUrl) {
+      document.querySelectorAll('.trans-drink-img, .order-drink-img, .rec-card-img').forEach(img => {
+        img.src = imageUrl;
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // 메뉴 옵션 데이터 (음성 인식으로 선택된 메뉴의 옵션)
+  // ═══════════════════════════════════════
+  const MENU_OPTIONS_DATA = {"슈크림 라떼_HOT": {"price": 6700, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "스위트 바닐라 소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "슈크림 라떼_ICED": {"price": 6700, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "스위트 바닐라 소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "슈 폼 라떼_HOT": {"price": 6700, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "스위트 바닐라 소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "슈 폼 라떼_ICED": {"price": 6700, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "스위트 바닐라 소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "스타벅스 에어로카노_ICED": {"price": 4900, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "시그니처 코르타도_HOT": {"price": 5800, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "밀크카라멜 라떼_HOT": {"price": 5800, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "솔티드 카라멜 시럽(보통)", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "밀크카라멜 라떼_ICED": {"price": 5800, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "솔티드 카라멜 시럽(보통)", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "플랫 화이트_HOT": {"price": 5800, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "플랫 화이트_ICED": {"price": 5800, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 아메리카노_HOT": {"price": 4700, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 아메리카노_ICED": {"price": 4700, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 라떼_HOT": {"price": 5200, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 라떼_ICED": {"price": 5200, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "바닐라 라떼_HOT": {"price": 5200, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "바닐라 라떼_ICED": {"price": 5200, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "스타벅스 돌체 라떼_HOT": {"price": 6100, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "돌체 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "두유", "오트(귀리)"], "default": "무지방"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "스타벅스 돌체 라떼_ICED": {"price": 6100, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "돌체 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "두유", "오트(귀리)"], "default": "무지방"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 모카_HOT": {"price": 5700, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "모카 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카페 모카_ICED": {"price": 5700, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "모카 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카푸치노_HOT": {"price": 5200, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카푸치노_ICED": {"price": 5200, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카라멜 마끼아또_HOT": {"price": 6100, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "카라멜 마끼아또_ICED": {"price": 6100, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "화이트 초콜릿 모카_HOT": {"price": 6100, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "화이트모카 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "화이트 초콜릿 모카_ICED": {"price": 6100, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "화이트모카 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "커피 스타벅스 더블 샷_ICED": {"price": 5300, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "바닐라 스타벅스 더블 샷_ICED": {"price": 5300, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "헤이즐넛 스타벅스 더블 샷_ICED": {"price": 5300, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "헤이즐넛 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "에스프레소_HOT": {"price": 3900, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "에스프레소 마끼아또_HOT": {"price": 3900, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "milk": {"options": ["저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "에스프레소 콘 파나_HOT": {"price": 4100, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "우디 카우보이 쿠키 콜드브루_ICED": {"price": 6900, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 3, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "바닐라 아인슈페너 콜드브루_ICED": {"price": 6100, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "프렌치 바닐라 콜드브루_ICED": {"price": 6300, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "프렌치 바닐라 시럽(보통)", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "바닐라 크림 콜드브루_ICED": {"price": 6000, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽", "defaultCount": 1, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "돌체 콜드브루_ICED": {"price": 6000, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "돌체 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "콜드브루_ICED": {"price": 5100, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "베르가못 콜드브루_ICED": {"price": 6000, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "베르가못향 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "오트 콜드브루_ICED": {"price": 6000, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유"], "default": "오트(귀리)"}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "스위트 밀크 커피_ICED": {"price": 5700, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "syrup": {"hasDefault": true, "defaultName": "바닐라 시럽(1), 화이트모카 시럽", "defaultCount": 2, "additionalOptions": ["헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "브루드 커피_HOT": {"price": 4500, "temp": "HOT", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "브루드 커피_ICED": {"price": 4500, "temp": "ICED", "shot": {"available": true, "pricePerShot": 800, "maxCount": 9}, "ice": {"options": ["없이", "적게", "많이"], "default": "보통"}, "drizzle": {"types": ["카라멜 드리즐", "초콜릿 드리즐"], "amounts": ["적게", "보통", "많이"]}}, "제시 슈트로베리 프라푸치노_ICED": {"price": 6700, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": ",프라푸치노용 시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "레드빈 빙수 블렌디드_ICED": {"price": 8300, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "통팥소스, (빙수)클래식 시럽", "defaultCount": 1}}, "애플망고 빙수 블렌디드_ICED": {"price": 8300, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "애플 망고 소스, (빙수)클래식 시럽", "defaultCount": 1}}, "자몽 허니 블렌디드_ICED": {"price": 6300, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽(2), 허니자몽소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "더블 에스프레소 칩 블렌디드_ICED": {"price": 6500, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "프라푸치노용 시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "제주 말차 크림 프라푸치노_ICED": {"price": 6500, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "프라푸치노용 시럽(1), 클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "자바 칩 프라푸치노_ICED": {"price": 6500, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑", "자바칩 없이"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "프라푸치노용 시럽(1), 모카시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "딸기 딜라이트 요거트 블렌디드_ICED": {"price": 6500, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "돌체시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "망고 바나나 블렌디드_ICED": {"price": 6600, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "초콜릿 크림 칩 프라푸치노_ICED": {"price": 6200, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "프라푸치노용 시럽(1), 모카시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "카라멜 프라푸치노_ICED": {"price": 6100, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "카라멜 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "에스프레소 프라푸치노_ICED": {"price": 5700, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "프라푸치노용 시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "망고 패션프루트 블렌디드_ICED": {"price": 5600, "temp": "ICED", "javaChip": {"options": ["자바칩", "자바칩&토핑(반반)", "통 자바칩 토핑"], "price": 800}, "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게", "보통", "많이"], "default": "보통"}}, "아이스 슈크림 말차 라떼_ICED": {"price": 6700, "temp": "ICED", "whipping": {"options": ["슈크림 휘핑", "일반 휘핑"], "price": 800}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 슈 폼 말차 라떼_ICED": {"price": 6700, "temp": "ICED", "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 얼그레이 바닐라 티 라떼_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "돌체시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "복숭아 아이스티_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "복숭아 소스", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 스타벅스 클래식 밀크 티_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "스타벅스 클래식 밀크 티 보틀_ICED": {"price": 13400, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 5}}, "아이스 제주 말차 라떼_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 유자 민트 티_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 자몽 허니 블랙 티_ICED": {"price": 5900, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽(2), 허니자몽소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 제주 유기농 녹차로 만든 티_ICED": {"price": 5300, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 잉글리쉬 브렉퍼스트 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 얼그레이 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 유스베리 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 히비스커스 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 민트 블렌드 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "아이스 캐모마일 블렌드 티_ICED": {"price": 4500, "temp": "ICED", "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "버즈 키위 팝 에너지 피지오 _ICED": {"price": 6700, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "-", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "쿨 라임 피지오_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "-", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "피치 딸기 피지오_ICED": {"price": 6100, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "-", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "체리&자두 에너지 피지오_ICED": {"price": 6300, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "-", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "스타벅스 딸기 라떼_ICED": {"price": 6500, "temp": "ICED", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["적게", "보통"], "default": "보통"}}, "아이스 시그니처 초콜릿_ICED": {"price": 5900, "temp": "ICED", "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "스팀 우유_HOT": {"price": 4100, "temp": "HOT", "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "보통"}}, "우유_ICED": {"price": 4100, "temp": "ICED", "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}}, "수박 주스 190ML_-": {"price": 4500, "temp": "-"}, "스퀴즈드 오렌지 주스190ML_-": {"price": 3800, "temp": "-"}, "딸기주스 190ML_-": {"price": 4500, "temp": "-"}, "유기농 오렌지 100% 주스 190ML_-": {"price": 4900, "temp": "-"}, "딸기 가득 요거트 190ML_-": {"price": 4100, "temp": "-"}, "햇사과 주스 190ML_-": {"price": 4700, "temp": "-"}, "망고주스 190ML_-": {"price": 4700, "temp": "-"}, "케일&사과주스 190ML_-": {"price": 4000, "temp": "-"}, "한라봉주스 190ML_-": {"price": 4700, "temp": "-"}, "블루베리 요거트 190ML_-": {"price": 4500, "temp": "-"}, "ABC 클렌즈 190ML_-": {"price": 4700, "temp": "-"}, "케일 클렌즈  190ML_-": {"price": 4700, "temp": "-"}, "에비앙 500ML_-": {"price": 3300, "temp": "-"}, "에비앙 스파클링 330ML_-": {"price": 3800, "temp": "-"}, "발라딘 콜라 330ML_-": {"price": 4700, "temp": "-"}, "유기농 스파클링 애플 주스 296ML_-": {"price": 4800, "temp": "-"}, "슈크림 말차 라떼_HOT": {"price": 6700, "temp": "HOT", "whipping": {"options": ["슈크림 휘핑", "일반 휘핑"], "price": 800}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}}, "슈 폼 말차 라떼_HOT": {"price": 6700, "temp": "HOT", "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}}, "얼그레이 바닐라 티 라떼_HOT": {"price": 6100, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "돌체시럽", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}}, "복숭아 핫 티_HOT": {"price": 6100, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "복숭아 소스", "defaultCount": 1, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게"], "default": "-"}}, "스타벅스 클래식 밀크 티_HOT": {"price": 6100, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}}, "제주 말차 라떼_HOT": {"price": 6100, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "milk": {"options": ["일반", "저지방", "무지방", "두유", "오트(귀리)"], "default": "일반"}, "ice": {"options": ["없이", "적게", "보통", "많이"], "default": "-"}}, "유자 민트 티_HOT": {"price": 6100, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽", "defaultCount": 2, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게"], "default": "-"}}, "자몽 허니 블랙 티_HOT": {"price": 5900, "temp": "HOT", "syrup": {"hasDefault": true, "defaultName": "클래식 시럽(2), 허니자몽소스", "defaultCount": 3, "additionalOptions": ["바닐라 시럽", "헤이즐넛 시럽", "카라멜 시럽"]}, "ice": {"options": ["적게"], "default": "-"}}, "제주 유기농 녹차로 만든 티_HOT": {"price": 5300, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "잉글리쉬 브렉퍼스트 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "얼그레이 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "유스베리 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "히비스커스 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "민트 블렌드 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}, "캐모마일 블렌드 티_HOT": {"price": 4500, "temp": "HOT", "ice": {"options": ["적게"], "default": "-"}}};
+
+  
+  // 추천 메뉴 3개 (엑셀에 실제 존재하는 메뉴로 업데이트)
+  const recMenus = [
+    {name:'스타벅스 딸기 라떼', en:'Starbucks Strawberry Latte', temp:'ICED', price:6500},
+    {name:'아이스 제주 말차 라떼', en:'Iced Jeju Matcha Latte', temp:'ICED', price:6100},
+    {name:'자바 칩 프라푸치노', en:'Java Chip Frappuccino', temp:'ICED', price:6500},
+  ];
+  
+  // STT state
+  let recognition = null;
+  let isSTTActive = false;
+  let isTTSPlaying = false;
+  let inactivityTimer = null;
+  let currentTalkBubble = null;
+  
+  // ═══════════════════════════════════════
+  //  CLOCK
+  // ═══════════════════════════════════════
+  function updateClock() {
+    const el = document.getElementById('status-time');
+    if(!el) return;
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2,'0');
+    const m = now.getMinutes().toString().padStart(2,'0');
+    el.textContent = h+':'+m;
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    updateClock();
+    setInterval(updateClock, 30000);
+  });
+  
+  // ═══════════════════════════════════════
+  //  PAGE NAVIGATION
+  // ═══════════════════════════════════════
+  function showPage(id, pushHistory=true) {
+    const prev = document.querySelector('.page.active');
+    const next = document.getElementById('page-'+id);
+    if(!next || prev === next) return;
+
+    const talkBubbleMap = {
+      'start':'talk-bubble-start',
+      'recommend':'talk-bubble-rec',
+      'request1':'talk-bubble-req1',
+      'reorder1':'talk-bubble-reorder1',
+      'reorder2':'talk-bubble-reorder2',
+      'optionlist':'talk-bubble-optionlist',
+      'ordercheck':'talk-bubble-ordercheck',
+    };
+    const oldBubbleId = talkBubbleMap[currentPage];
+    if(oldBubbleId) {
+      const oldBubble = document.getElementById(oldBubbleId);
+      if(oldBubble) {
+        oldBubble.innerHTML = '';
+        oldBubble.classList.remove('visible');
+      }
+    }
+
+    if(pushHistory && currentPage !== 'home') {
+      pageHistory.push(currentPage);
+    }
+
+    if(prev) {
+      prev.classList.remove('active');
+      prev.classList.add('leaving');
+      setTimeout(()=> prev.classList.remove('leaving'), 350);
+    }
+    next.classList.add('active');
+    currentPage = id;
+  }
+  
+  function goBack() {
+    if(pageHistory.length === 0) {
+      exitToHome(); return;
+    }
+    const prev = pageHistory.pop();
+    const curr = document.getElementById('page-'+currentPage);
+    if(curr) {
+      curr.classList.remove('active');
+      curr.style.transform = 'translateX(100%)';
+      setTimeout(()=> curr.style.transform = '', 350);
+    }
+    const target = document.getElementById('page-'+prev);
+    if(target) {
+      target.classList.add('active');
+      target.classList.remove('leaving');
+      currentPage = prev;
+    }
+  }
+  
+  // ═══════════════════════════════════════
+  //  HOME → VOICE ORDER
+  // ═══════════════════════════════════════
+  function enterVoiceOrder() {
+    // [수정 1] 새 주문 시작 시 orderState 완전 초기화
+    orderState = createEmptyOrderState();
+    editedOptions = new Set();
+    selectedRecIndex = -1;
+    pageHistory = [];
+    speakTTS('안녕하세요, 듣고 있어요! 어떤 음료를 준비해드릴까요? 퍼스널 옵션도 한 번에 말씀하실 수 있어요', ()=>{ startSTT(); });
+    showPage('start');
+  }
+  
+  // ═══════════════════════════════════════
+  //  CLOSE MODAL helpers
+  // ═══════════════════════════════════════
+  function showCloseModal() {
+    stopSTT();
+    stopTTS();
+    speakTTS('보이스 오더를 종료하시겠어요? 계속하시려면 계속하기를, 종료하시려면 종료하기를 탭해 주세요.');
+    document.getElementById('close-modal').classList.add('visible');
+  }
+  function showCloseModal2() {
+    stopTTS();
+    speakTTS('보이스 오더를 종료하시겠어요?');
+    document.getElementById('close-modal-2').classList.add('visible');
+  }
+  function showCloseModalAny(page) {
+    stopSTT(); stopTTS();
+    const modal = document.getElementById('close-modal-'+pageModalId(page));
+    if(modal) { speakTTS('보이스 오더를 종료하시겠어요?'); modal.classList.add('visible'); }
+  }
+  function pageModalId(page) {
+    const map = {'recommend':'rec','request1':'req1','reorder1':'ro1','reorder2':'ro2','optionlist':'ol','ordercheck':'oc'};
+    return map[page] || page;
+  }
+  function handleModalOverlay(e) {
+    document.getElementById('close-modal').classList.remove('visible');
+    startSTT();
+  }
+  function handleModalOverlay2(e) { document.getElementById('close-modal-2').classList.remove('visible'); }
+  function handleModalOverlayAny(e, page) {
+    const modal = document.getElementById('close-modal-'+pageModalId(page));
+    if(modal) modal.classList.remove('visible');
+    startSTT();
+  }
+  function continueVoiceOrder() {
+    document.getElementById('close-modal').classList.remove('visible');
+    startSTT();
+  }
+  function continueVoiceOrder2() { document.getElementById('close-modal-2').classList.remove('visible'); }
+  function continueVoiceOrderAny(page) {
+    const modal = document.getElementById('close-modal-'+pageModalId(page));
+    if(modal) modal.classList.remove('visible');
+    startSTT();
+  }
+  function exitToHome() {
+    document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('visible'));
+    stopSTT(); stopTTS();
+    pageHistory = [];
+    const curr = document.getElementById('page-'+currentPage);
+    if(curr) { curr.classList.remove('active'); curr.style.transform = ''; }
+    const home = document.getElementById('page-home');
+    home.classList.add('active');
+    home.style.transform = 'translateX(0)';
+    currentPage = 'home';
+  }
+  
+  // ═══════════════════════════════════════
+  //  FLOW NAVIGATION
+  // ═══════════════════════════════════════
+  function goToTranslation() {
+    showPage('translation');
+    stopSTT();
+    document.getElementById('trans-menu-name').textContent = orderState.menu;
+    updateDrinkImage();
+    startCircularProgress('trans-ring-fill', 345, 3000, ()=> goToOrderCheck());
+    speakTTS('메뉴 분석중');
+  }
+
+  function goToConfirm() {
+    goToAddToCart();
+  }
+  
+  function goToAddToCart() {
+    showPage('addtocart');
+    stopSTT(); stopTTS();
+    document.getElementById('addcart-menu-name').textContent = orderState.menu;
+    speakTTS('장바구니에 담는 중이에요.');
+    startCircularProgress('addcart-ring-fill', 345, 3000, ()=> goToCart());
+  }
+  
+  function goToCart() {
+    showPage('cart');
+    updateCartUI();
+    stopSTT();
+    speakTTS('장바구니에 담겼어요!');
+  }
+  
+  function goToReorder() {
+    showPage('reorder1');
+    const bubble = document.getElementById('talk-bubble-reorder1');
+    if(bubble) {
+      bubble.innerHTML = '';
+      bubble.classList.remove('visible');
+    }
+    buildReorderOptions();
+    updateDrinkImage();
+    stopSTT();
+    setTimeout(()=>{
+      speakTTS('어떤 옵션을 수정할까요?', ()=>{ startSTT(); });
+    }, 300);
+  }
+  
+  function goToReorder2() {
+    showPage('reorder2');
+    updateReorder2UI();
+    updateDrinkImage();
+    stopSTT();
+    const summaryText = buildOrderSummaryTTS();
+    const fullText = "이대로 주문할까요? " + summaryText + " " + "맞으면 '주문', 틀리면 '수정'이라고 말씀해 주세요!";
+    speakTTS(fullText, ()=>{ startSTT(); });
+  }
+  
+  function goToOrderCheck() {
+    showPage('ordercheck');
+    updateOrderCheckUI();
+    updateDrinkImage();
+    stopSTT();
+    setTimeout(()=>{
+      const summaryText = buildOrderSummaryTTS();
+      const fullText = "주문 내용을 확인할게요. " + summaryText + " " + "맞으면 '주문', 틀리면 '수정'이라고 말씀해 주세요!";
+      speakTTS(fullText, ()=>{ startSTT(); });
+    }, 300);
+  }
+  
+  function goToOptionList() {
+    showPage('optionlist');
+    buildOptionList();
+    stopSTT();
+    setTimeout(()=>{
+      speakTTS('옵션 목록이에요. 각 항목을 탭하거나 말씀해서 수정할 수 있어요!', ()=>{ startSTT(); });
+    }, 300);
+  }
+  
+  function goToRecommend() {
+    showPage('recommend');
+    setTimeout(()=>{
+      speakTTS('말씀하신 옵션에 맞는 메뉴를 추천해드릴게요. 원하시는 메뉴를 선택해 주세요!', ()=>{ startSTT(); });
+    }, 300);
+  }
+  
+  function goToRequest1() {
+    showPage('request1');
+    setTimeout(()=>{
+      speakTTS('따뜻하게 드릴까요, 아이스로 드릴까요?', ()=>{ startSTT(); });
+    }, 300);
+  }
+  
+  // ═══════════════════════════════════════
+  //  UI UPDATE HELPERS
+  // ═══════════════════════════════════════
+  function calcTotal() {
+    let total = orderState.basePrice || 0;
+
+    if(orderState.bean === 'Decaf' || orderState.bean === '1/2 Decaf') {
+      total += 300;
+    }
+
+    if(orderState.size === 'Grande') total += 600;
+    else if(orderState.size === 'Venti') total += 1400;
+
+    total += ((orderState.extraShots || 0) * 800);
+
+    // 시럽: 각 시럽의 count 합 * 800
+    if(orderState.syrups && orderState.syrups.length > 0) {
+      const syrupCount = orderState.syrups.reduce((sum, s) => sum + (s.count || 0), 0);
+      total += (syrupCount * 800);
+    }
+
+    // 프라푸치노 시럽 (바닐라, 헤이즐넛, 카라멜: 1-9개 800원, 모카: 무료)
+    if(orderState.vanillaSyrupCount > 0) total += 800;
+    if(orderState.hazelnutSyrupCount > 0) total += 800;
+    if(orderState.caramelSyrupCount > 0) total += 800;
+
+    // 드리즐 (각각 800원)
+    if(orderState.caramelDrizzle) total += 800;
+    if(orderState.chocolateDrizzle) total += 800;
+
+    // 우유 가격 (오트: 800원)
+    if(orderState.milk === '오트') {
+      total += 800;
+    }
+
+    // 수량으로 곱하기
+    const quantity = orderState.quantity || 1;
+    total = total * quantity;
+
+    return total;
+  }
+  function formatPrice(n){ return n.toLocaleString('ko-KR')+'원'; }
+  
+  function getShotLabel(){
+    if(orderState.extraShots > 0) return '에스프레소샷 +'+orderState.extraShots+'샷 (총 '+orderState.shots+'샷)';
+    const baseShots = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+    return '에스프레소샷 기본 ('+baseShots+'샷)';
+  }
+  function getSyrupLabel(){
+    if(!orderState.syrups.length) return null;
+    return orderState.syrups.map(s=>s.name+' 시럽 '+s.count+'펌프').join(', ');
+  }
+  function getBaseLabel(){
+    const tempLabel = orderState.temp === 'HOT' ? 'HOT' : (orderState.temp === 'ICED' ? 'ICED' : '온도 미정');
+    return tempLabel + '  |  ' + orderState.size;
+  }
+  function getIceLabel(){
+    return '얼음 ' + orderState.ice;
+  }
+  
+  // [수정 5] orderState에 실제 저장된 값과 1:1 매핑
+  function updateOrderCheckUI() {
+    const total = calcTotal();
+    document.getElementById('oc-menu-name').textContent = orderState.menu || '메뉴 미정';
+    document.getElementById('oc-menu-en').textContent = orderState.menuEn || '';
+
+    // 옵션 컨테이너 초기화
+    const optContainer = document.getElementById('oc-options');
+    optContainer.innerHTML = '';
+
+    // [수정] 기본 가격에 사이즈 비용 포함하여 표시
+    let basePriceWithSize = orderState.basePrice;
+    if(orderState.size === 'Grande') basePriceWithSize += 600;
+    else if(orderState.size === 'Venti') basePriceWithSize += 1400;
+
+    // 기본 행 추가
+    const baseRow = document.createElement('div');
+    baseRow.className = 'order-opt-row';
+    baseRow.innerHTML = `<span class="order-opt-label">${getBaseLabel()}</span><span class="order-opt-price">${formatPrice(basePriceWithSize)}</span>`;
+    optContainer.appendChild(baseRow);
+
+    // editedOptions에 있는 옵션들만 동적으로 표시
+    editedOptions.forEach(optId => {
+      let label = '';
+      let price = 0;
+      let showPrice = true;
+
+      // Skip size and temp since they're already shown in base label
+      if(optId === 'size' || optId === 'temp') {
+        return;
+      } else if(optId === 'bean' && (orderState.bean === 'Decaf' || orderState.bean === '1/2 Decaf')) {
+        label = `원두 ${orderState.bean}`;
+        price = 300;
+      } else if(optId === 'shot' && orderState.extraShots > 0) {
+        label = `에스프레소샷 ${orderState.shots}`;
+        price = orderState.extraShots * 800;
+      } else if(optId === 'water') {
+        label = `물(베이스) ${orderState.water}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'milk') {
+        if(orderState.milk === '오트') {
+          label = `우유 ${orderState.milk}`;
+          price = 800;
+        } else {
+          label = `우유 ${orderState.milk}`;
+          price = 0;
+          showPrice = false;
+        }
+      } else if(optId === 'hazelnutSyrup' && orderState.hazelnutSyrupCount > 0) {
+        label = `헤이즐넛시럽 ${orderState.hazelnutSyrupCount}개`;
+        price = 800;
+      } else if(optId === 'vanillaSyrup' && orderState.vanillaSyrupCount > 0) {
+        label = `바닐라시럽 ${orderState.vanillaSyrupCount}개`;
+        price = 800;
+      } else if(optId === 'caramelSyrup' && orderState.caramelSyrupCount > 0) {
+        label = `카라멜시럽 ${orderState.caramelSyrupCount}개`;
+        price = 800;
+      } else if(optId === 'mokaSyrup' && orderState.mokaSyrupCount > 0) {
+        label = `모카시럽 ${orderState.mokaSyrupCount}개`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'syrup' && orderState.syrups && orderState.syrups.length > 0) {
+        orderState.syrups.forEach((s, idx) => {
+          if(idx === 0 && !label) {
+            label = `${s.name}시럽 ${s.count}펌프`;
+            price = 800;
+          } else {
+            const row = document.createElement('div');
+            row.className = 'order-opt-row highlighted';
+            row.innerHTML = `<span class="order-opt-label">${s.name}시럽 ${s.count}펌프</span><span class="order-opt-price">${formatPrice(800)}</span>`;
+            optContainer.appendChild(row);
+          }
+        });
+      } else if(optId === 'caramelDrizzle' && orderState.caramelDrizzle) {
+        label = `카라멜드리즐 ${orderState.caramelDrizzle}`;
+        price = 800;
+      } else if(optId === 'chocolateDrizzle' && orderState.chocolateDrizzle) {
+        label = `초콜릿드리즐 ${orderState.chocolateDrizzle}`;
+        price = 800;
+      } else if(optId === 'javachip' && orderState.javachip) {
+        label = `자바칩 ${orderState.javachip}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'whipping') {
+        const whipLabel = orderState.whipping === '없음' ? '휘핑 없이' : `휘핑 ${orderState.whipping}`;
+        label = whipLabel;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'frappuccinoSyrupType') {
+        label = `프라푸치노용시럽 ${orderState.frappuccinoSyrupType}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'milkTemp') {
+        label = `우유온도 ${orderState.milkTemp}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'milkFoam') {
+        label = `우유거품 ${orderState.milkFoam}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'ice' && orderState.ice && orderState.temp === 'ICED') {
+        label = `얼음 ${orderState.ice}`;
+        price = 0;
+        showPrice = false;
+      } else if(optId === 'quantity') {
+        label = `수량 ${orderState.quantity}`;
+        price = 0;
+        showPrice = false;
+      } else {
+        return;
+      }
+
+      if(label) {
+        const row = document.createElement('div');
+        row.className = 'order-opt-row highlighted';
+        if(showPrice) {
+          row.innerHTML = `<span class="order-opt-label">${label}</span><span class="order-opt-price">${formatPrice(price)}</span>`;
+        } else {
+          row.innerHTML = `<span class="order-opt-label">${label}</span>`;
+        }
+        optContainer.appendChild(row);
+      }
+    });
+
+    // 총합 업데이트 (수량 포함)
+    const finalTotal = calcTotal();
+    document.getElementById('oc-total').textContent = formatPrice(finalTotal);
+
+    // Sync with cart-order-card
+    const ordercheckCard = document.getElementById('ordercheck-card');
+    const cartCard = document.getElementById('cart-order-card');
+    if(ordercheckCard && cartCard) {
+      cartCard.innerHTML = ordercheckCard.innerHTML;
+    }
+  }
+  
+  // Cart UI - reorder2-card와 동일하게 표시
+  function updateCartUI() {
+    document.getElementById('cart-ro-name').textContent = orderState.menu;
+    document.getElementById('cart-ro-en').textContent = orderState.menuEn;
+    const opts = document.getElementById('cart-ro-options');
+    opts.innerHTML = '';
+
+    let basePriceWithSize = orderState.basePrice;
+    if(orderState.size === 'Grande') basePriceWithSize += 600;
+    else if(orderState.size === 'Venti') basePriceWithSize += 1400;
+
+    const rows = [
+      { label: getBaseLabel(), price: formatPrice(basePriceWithSize), showPrice: true, priceValue: basePriceWithSize },
+    ];
+
+    // 수정된 옵션만 표시 (editedOptions)
+    optionDefs.forEach(opt => {
+      if(opt.hidden && opt.hidden()) return;
+
+      // size는 항상 표시 (getBaseLabel에 포함), 나머지는 editedOptions에 있는 것만 표시
+      if(opt.id !== 'size' && !editedOptions.has(opt.id)) return;
+
+      const val = opt.getVal();
+
+      // whipping은 '없음'이어도 표시해야 함
+      if(opt.id === 'whipping') {
+        const whipLabel = val === '없음' ? '휘핑 없이' : `휘핑 ${val}`;
+        rows.push({label:whipLabel, price:null, showPrice:false, priceValue:0});
+        return;
+      }
+
+      // frappuccinoSyrupType 처리
+      if(opt.id === 'frappuccinoSyrupType') {
+        if(val && val !== '없음') {
+          rows.push({label:`프라푸치노용시럽 ${val}`, price:null, showPrice:false, priceValue:0});
+        }
+        return;
+      }
+
+      if(!val || val === '없음') return;
+
+      let price = null;
+      let priceValue = 0;
+      let showPrice = true;
+
+      if(opt.id === 'size') return;
+      else if(opt.id === 'bean' && (orderState.bean === 'Decaf' || orderState.bean === '1/2 Decaf')) {
+        price = formatPrice(300);
+        priceValue = 300;
+      } else if(opt.id === 'shot') {
+        if(orderState.extraShots > 0) {
+          const shotPrice = orderState.extraShots * 800;
+          rows.push({label:'에스프레소샷 '+orderState.extraShots+'샷 추가',price:formatPrice(shotPrice),showPrice:true,priceValue:shotPrice});
+        }
+        return;
+      } else if(opt.id === 'bean') {
+        showPrice = false;
+      } else if(opt.id === 'milk') {
+        if(orderState.milk === '오트') {
+          price = formatPrice(800);
+          priceValue = 800;
+        } else {
+          showPrice = false;
+        }
+      } else if(opt.id === 'javachip' || opt.id === 'ice') {
+        showPrice = false;
+      } else if(opt.id === 'milkTemp' || opt.id === 'milkFoam') {
+        showPrice = false;
+      } else if(opt.id === 'mokaSyrup' && orderState.mokaSyrupCount > 0) {
+        showPrice = false;
+      } else if(opt.id === 'vanillaSyrup' && orderState.vanillaSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'hazelnutSyrup' && orderState.hazelnutSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'caramelSyrup' && orderState.caramelSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'syrup') {
+        orderState.syrups.forEach(s => {
+          rows.push({label:s.name+' 시럽 '+s.count+'펌프',price:formatPrice(800),showPrice:true,priceValue:800});
+        });
+        return;
+      } else if(opt.id === 'caramelDrizzle' && orderState.caramelDrizzle) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'chocolateDrizzle' && orderState.chocolateDrizzle) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'water' || opt.id === 'temp') {
+        return;
+      }
+
+      if(val && val !== '없음') {
+        rows.push({label:opt.label+' '+val, price:price, showPrice:showPrice, priceValue:priceValue});
+      }
+    });
+
+    const quantity = orderState.quantity || 1;
+    rows.push({label:'수량 '+quantity, isQuantity: true});
+
+    rows.forEach(r=>{
+      const row = document.createElement('div');
+      row.className = 'order-opt-row';
+      if(r.isQuantity) {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span>`;
+      } else if(r.showPrice) {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span><span class="order-opt-price">${r.price}</span>`;
+      } else {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span>`;
+      }
+      opts.appendChild(row);
+    });
+
+    const total = calcTotal();
+    document.getElementById('cart-ro-total').textContent = formatPrice(total);
+  }
+  
+  function buildOrderSummaryTTS() {
+    let txt = (orderState.menu || '메뉴') + ', ';
+
+    // 기본가격 (온도 | 사이즈)
+    let basePriceWithSize = orderState.basePrice;
+    if(orderState.size === 'Grande') basePriceWithSize += 600;
+    else if(orderState.size === 'Venti') basePriceWithSize += 1400;
+    txt += (orderState.temp === 'HOT' ? 'HOT' : 'ICED') + ' | ' + orderState.size + ' ' + formatPrice(basePriceWithSize) + ', ';
+
+    // 편집된 옵션들을 순서대로 읽음
+    let total = basePriceWithSize;
+    optionDefs.forEach(opt => {
+      if(opt.hidden && opt.hidden()) return;
+      if(!editedOptions.has(opt.id)) return;
+      if(opt.id === 'size' || opt.id === 'temp' || opt.id === 'water') return;
+
+      const val = opt.getVal();
+
+      // whipping은 '없음'이어도 포함해야 함
+      if(opt.id === 'whipping') {
+        if(val === '없음') {
+          txt += '휘핑 없이, ';
+        } else {
+          txt += opt.label + ' ' + val + ', ';
+        }
+        return;
+      }
+
+      if(!val || val === '없음') return;
+
+      if(opt.id === 'shot') {
+        if(orderState.extraShots > 0) {
+          txt += '에스프레소샷 ' + orderState.extraShots + '샷 추가, ';
+          total += orderState.extraShots * 800;
+        }
+      } else if(opt.id === 'bean' && (orderState.bean === 'Decaf' || orderState.bean === '1/2 Decaf')) {
+        txt += '원두 ' + orderState.bean + ' ' + formatPrice(300) + ', ';
+        total += 300;
+      } else if(opt.id === 'bean') {
+        txt += '원두 ' + val + ', ';
+      } else if(opt.id === 'milk') {
+        if(orderState.milk === '오트') {
+          txt += '우유 ' + val + ' ' + formatPrice(800) + ', ';
+          total += 800;
+        } else {
+          txt += '우유 ' + val + ', ';
+        }
+      } else if(opt.id === 'milkTemp' || opt.id === 'milkFoam') {
+        txt += opt.label + ' ' + val + ', ';
+      } else if(opt.id === 'coffee' || opt.id === 'javachip' || opt.id === 'frappuccinoSyrupType' || opt.id === 'ice') {
+        txt += opt.label + ' ' + val + ', ';
+      } else if(opt.id === 'mokaSyrup' && orderState.mokaSyrupCount > 0) {
+        const baseCount = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+        const additionalCount = Math.max(0, orderState.mokaSyrupCount - baseCount);
+        txt += opt.label + ' ' + additionalCount + '개 추가, ';
+      } else if(opt.id === 'vanillaSyrup' && orderState.vanillaSyrupCount > 0) {
+        txt += opt.label + ' ' + val + ' ' + formatPrice(800) + ', ';
+        total += 800;
+      } else if(opt.id === 'hazelnutSyrup' && orderState.hazelnutSyrupCount > 0) {
+        txt += opt.label + ' ' + val + ' ' + formatPrice(800) + ', ';
+        total += 800;
+      } else if(opt.id === 'caramelSyrup' && orderState.caramelSyrupCount > 0) {
+        txt += opt.label + ' ' + val + ' ' + formatPrice(800) + ', ';
+        total += 800;
+      } else if(opt.id === 'caramelDrizzle' && orderState.caramelDrizzle) {
+        txt += opt.label + ' ' + val + ' ' + formatPrice(800) + ', ';
+        total += 800;
+      } else if(opt.id === 'chocolateDrizzle' && orderState.chocolateDrizzle) {
+        txt += opt.label + ' ' + val + ' ' + formatPrice(800) + ', ';
+        total += 800;
+      } else if(opt.id !== 'syrup') {
+        txt += opt.label + ' ' + val + ', ';
+      }
+    });
+
+    // 수량 추가
+    const quantity = orderState.quantity || 1;
+    txt += '수량 ' + quantity + '잔 ' + '총 ' + formatPrice(total * quantity) + '입니다.';
+    return txt;
+  }
+  
+  // ═══════════════════════════════════════
+  //  CIRCULAR PROGRESS
+  // ═══════════════════════════════════════
+  function startCircularProgress(ringId, totalDash, durationMs, onComplete) {
+    const ring = document.getElementById(ringId);
+    if(!ring) return;
+    ring.style.strokeDashoffset = totalDash;
+    let start = null;
+    function animate(ts) {
+      if(!start) start = ts;
+      const elapsed = ts - start;
+      const progress = Math.min(elapsed / durationMs, 1);
+      ring.style.strokeDashoffset = totalDash * (1 - progress);
+      if(progress < 1) requestAnimationFrame(animate);
+      else if(onComplete) onComplete();
+    }
+    requestAnimationFrame(animate);
+  }
+  
+  // ═══════════════════════════════════════
+  //  OPTION TOGGLES for Reorder / OptionList
+  // ═══════════════════════════════════════
+  const optionDefs = [
+    { id:'temp', label:'온도', getVal:()=>orderState.temp,
+      options:()=>orderState.menu.includes('프라푸')?['ICED']:['HOT','ICED'],
+      apply:(v)=>{ orderState.temp=v; editedOptions.add('temp'); } },
+    { id:'size', label:'사이즈', getVal:()=>orderState.size,
+      options:['Short','Tall','Grande','Venti'],
+      apply:(v)=>{
+        orderState.size=v;
+        // Update default shots based on new size
+        const newBaseShots = v==='Short'?1:(v==='Tall'?2:(v==='Grande'?3:4));
+        orderState.shots = newBaseShots;
+        orderState.extraShots = 0;
+        editedOptions.add('size');
+        // Update shot UI display
+        const optvalShot = document.getElementById('optval-shot');
+        if(optvalShot) {
+          optvalShot.textContent = newBaseShots+'샷 (기본 '+newBaseShots+' + 추가 0)';
+        }
+        // Update shot button active states
+        const shotBtns = document.querySelectorAll('#optbody-shot .opt-sub-btn');
+        shotBtns.forEach(btn => {
+          if(btn.textContent.startsWith(newBaseShots+'샷')) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      } },
+    { id:'bean', label:'원두', getVal:()=>orderState.bean,
+      options:['Signature','Blonde','Decaf','1/2 Decaf'],
+      apply:(v)=>{ orderState.bean=v; editedOptions.add('bean'); } },
+    { id:'water', label:'물(베이스)', getVal:()=>orderState.water,
+      options:['적게','보통','많이'],
+      apply:(v)=>{ orderState.water=v; editedOptions.add('water'); },
+      hidden:()=>orderState.menu.includes('프라푸') },
+    { id:'shot', label:'에스프레소샷', getVal:()=>{
+        return orderState.shots+'샷';
+      },
+      options:['1샷','2샷','3샷','4샷','5샷','6샷','7샷','8샷','9샷'],
+      apply:(v)=>{
+        const m=v.match(/(\d+)샷/);
+        if(m){
+          const totalShots = +m[1];
+          const baseShots = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+          orderState.shots = totalShots;
+          orderState.extraShots = Math.max(0, totalShots - baseShots);
+        }
+        editedOptions.add('shot');
+      },
+      hidden:()=>orderState.menu.includes('프라푸') },
+    { id:'whipping', label:'휘핑', getVal:()=>orderState.whipping||'일반',
+      options:['없이','적게','보통','많이'],
+      apply:(v)=>{ orderState.whipping=v; editedOptions.add('whipping'); },
+      hidden:()=>!orderState.menu.includes('프라푸') },
+    { id:'javachip', label:'자바칩', getVal:()=>orderState.javachip||'자바칩',
+      options:['자바칩','자바칩&토핑반반','통 자바칩 토핑','자바칩없이'],
+      apply:(v)=>{ orderState.javachip=v; editedOptions.add('javachip'); },
+      hidden:()=>!orderState.menu.includes('프라푸') },
+    { id:'milk', label:'우유', getVal:()=>orderState.milk||'일반',
+      options:['일반','저지방','무지방','두유','오트'],
+      apply:(v)=>{ orderState.milk=v; editedOptions.add('milk'); },
+      hidden:()=>orderState.menu.includes('아메리카노') },
+    { id:'milkTemp', label:'우유 온도', getVal:()=>orderState.milkTemp||'보통',
+      options:['덜 뜨겁게','보통','많이 뜨겁게'],
+      apply:(v)=>{ orderState.milkTemp=v; editedOptions.add('milkTemp'); },
+      hidden:()=>orderState.menu.includes('아메리카노') || orderState.menu.includes('프라푸') },
+    { id:'milkFoam', label:'우유거품', getVal:()=>orderState.milkFoam||'일반',
+      options:['없이','적게','많이'],
+      apply:(v)=>{ orderState.milkFoam=v; editedOptions.add('milkFoam'); },
+      hidden:()=>orderState.menu.includes('아메리카노') || orderState.menu.includes('프라푸') },
+    { id:'frappuccinoSyrupType', label:'프라푸치노용시럽', getVal:()=>orderState.frappuccinoSyrupType,
+      options:['일반','라이트'],
+      apply:(v)=>{ orderState.frappuccinoSyrupType=v; editedOptions.add('frappuccinoSyrupType'); },
+      hidden:()=>!orderState.menu.includes('프라푸') },
+    { id:'mokaSyrup', label:'모카시럽', getVal:()=>{
+        if(orderState.mokaSyrupCount===0) return '없음';
+        const baseCount = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+        const additional = Math.max(0, orderState.mokaSyrupCount - baseCount);
+        return orderState.mokaSyrupCount+'(기본'+baseCount+'+추가'+additional+')';
+      },
+      options:()=>{
+        const opts = [];
+        for(let i=1; i<=9; i++) {
+          opts.push(i+'개');
+        }
+        opts.unshift('없음');
+        return opts;
+      },
+      apply:(v)=>{
+        if(v==='없음') {
+          orderState.mokaSyrupCount = 0;
+        } else {
+          const m=v.match(/(\d+)개/);
+          if(m) {
+            const baseCount = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+            const selectedCount = parseInt(m[1]);
+            orderState.mokaSyrupCount = baseCount + selectedCount;
+          }
+        }
+        editedOptions.add('mokaSyrup');
+      },
+      hidden:()=>!orderState.menu.includes('프라푸') },
+    { id:'vanillaSyrup', label:'바닐라시럽', getVal:()=>{
+        if(orderState.vanillaSyrupCount===0) return '없음';
+        return orderState.vanillaSyrupCount+'';
+      },
+      options:()=>{
+        const opts = [];
+        for(let i=0; i<=9; i++) opts.push((i===0?'없음':i+'개'));
+        return opts;
+      },
+      apply:(v)=>{
+        const m=v.match(/(\d+)/);
+        orderState.vanillaSyrupCount = m ? parseInt(m[1]) : 0;
+        editedOptions.add('vanillaSyrup');
+      } },
+    { id:'hazelnutSyrup', label:'헤이즐넛시럽', getVal:()=>{
+        if(orderState.hazelnutSyrupCount===0) return '없음';
+        return orderState.hazelnutSyrupCount+'';
+      },
+      options:()=>{
+        const opts = [];
+        for(let i=0; i<=9; i++) opts.push((i===0?'없음':i+'개'));
+        return opts;
+      },
+      apply:(v)=>{
+        const m=v.match(/(\d+)/);
+        orderState.hazelnutSyrupCount = m ? parseInt(m[1]) : 0;
+        editedOptions.add('hazelnutSyrup');
+      } },
+    { id:'caramelSyrup', label:'카라멜시럽', getVal:()=>{
+        if(orderState.caramelSyrupCount===0) return '없음';
+        return orderState.caramelSyrupCount+'';
+      },
+      options:()=>{
+        const opts = [];
+        for(let i=0; i<=9; i++) opts.push((i===0?'없음':i+'개'));
+        return opts;
+      },
+      apply:(v)=>{
+        const m=v.match(/(\d+)/);
+        orderState.caramelSyrupCount = m ? parseInt(m[1]) : 0;
+        editedOptions.add('caramelSyrup');
+      } },
+    { id:'caramelDrizzle', label:'카라멜드리즐', getVal:()=>orderState.caramelDrizzle||'없음',
+      options:['없음','적게','보통','많이'],
+      apply:(v)=>{ orderState.caramelDrizzle=v==='없음'?'':v; editedOptions.add('caramelDrizzle'); } },
+    { id:'chocolateDrizzle', label:'초콜릿드리즐', getVal:()=>orderState.chocolateDrizzle||'없음',
+      options:['없음','적게','보통','많이'],
+      apply:(v)=>{ orderState.chocolateDrizzle=v==='없음'?'':v; editedOptions.add('chocolateDrizzle'); } },
+    { id:'ice', label:'얼음', getVal:()=>orderState.ice,
+      options:['없이','적게','보통','많이'],
+      apply:(v)=>{ orderState.ice=v; editedOptions.add('ice'); },
+      hidden:()=>orderState.temp!=='ICED' },
+    { id:'quantity', label:'수량', getVal:()=>orderState.quantity||1,
+      options:()=>{
+        const opts = [];
+        for(let i=1; i<=20; i++) opts.push(i+'잔');
+        return opts;
+      },
+      apply:(v)=>{
+        const m=v.match(/(\d+)/);
+        orderState.quantity = m ? parseInt(m[1]) : 1;
+        editedOptions.add('quantity');
+      } },
+  ];
+
+  function readReorderOptions() {
+    stopSTT(); stopTTS();
+    const optionLabels = [];
+    optionDefs.forEach(opt => {
+      if(!opt.hidden || !opt.hidden()) {
+        optionLabels.push(opt.label);
+      }
+    });
+
+    const optionText = optionLabels.join('\', \'');
+    const fullText = '커스텀 하실 수 있는 옵션은 \'' + optionText + '\'입니다. 무엇을 수정하시겠어요?';
+    speakTTS(fullText, ()=>{ startSTT(); });
+  }
+
+  function readReorderOptionsList() {
+    stopSTT(); stopTTS();
+    const optionNames = [];
+    const nameElements = document.querySelectorAll('#reorder1-options .opt-toggle-name');
+    nameElements.forEach(el => {
+      if(el.textContent.trim()) {
+        optionNames.push(el.textContent.trim());
+      }
+    });
+
+    if(optionNames.length === 0) {
+      speakTTS('사용 가능한 옵션이 없습니다.', ()=>{ startSTT(); });
+      return;
+    }
+
+    const optionText = optionNames.join('\', \'');
+    const fullText = '사용 가능한 옵션은 \'' + optionText + '\'입니다.';
+    speakTTS(fullText, ()=>{ startSTT(); });
+  }
+
+  function buildReorderOptions() {
+    const container = document.getElementById('reorder1-options');
+    container.innerHTML = '<div class="reorder-subtitle">'+orderState.menu+' 옵션</div>';
+    optionDefs.forEach(opt=>{
+      if(opt.hidden && opt.hidden()) return;
+      const isHighlighted = editedOptions.has(opt.id);
+      const div = document.createElement('div');
+      div.className = 'opt-toggle'+(isHighlighted?' highlighted':'');
+      div.id = 'opt-'+opt.id;
+      const opts = typeof opt.options === 'function' ? opt.options() : opt.options;
+      div.innerHTML = `
+        <div class="opt-toggle-header" onclick="toggleOptOpen('${opt.id}')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">${opt.label}</span>
+            <span class="opt-toggle-val" id="optval-${opt.id}">${opt.getVal()}</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="optbody-${opt.id}">
+          ${opts.map(o=>`<button class="opt-sub-btn${opt.getVal()===o?' active':''}" onclick="applyOption('${opt.id}','${o}',this)">${o}<span class="opt-sub-check">✓</span></button>`).join('')}
+        </div>`;
+      container.appendChild(div);
+    });
+  }
+  
+  function buildOptionList() {
+    const container = document.getElementById('optionlist-wrap');
+    container.innerHTML = '';
+    optionDefs.forEach(opt=>{
+      if(opt.hidden && opt.hidden()) return;
+      const isModified = editedOptions.has(opt.id);
+      const div = document.createElement('div');
+      div.className = 'opt-toggle'+(isModified?' highlighted':'');
+      div.id = 'ol-opt-'+opt.id;
+      const opts = typeof opt.options === 'function' ? opt.options() : opt.options;
+      div.innerHTML = `
+        <div class="opt-toggle-header" onclick="toggleOptOpenOL('${opt.id}')">
+          <div class="opt-toggle-left">
+            <span class="opt-toggle-name">${opt.label}</span>
+            <span class="opt-toggle-val" id="olval-${opt.id}">${opt.getVal()}</span>
+          </div>
+          <div class="opt-toggle-arrow">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#737373" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="opt-toggle-body" id="olbody-${opt.id}">
+          ${opts.map(o=>`<button class="opt-sub-btn${opt.getVal()===o?' active':''}" onclick="applyOptionOL('${opt.id}','${o}',this)">${o}<span class="opt-sub-check">✓</span></button>`).join('')}
+        </div>`;
+      container.appendChild(div);
+    });
+  }
+  
+  function updateReorder2UI() {
+    document.getElementById('ro2-name').textContent = orderState.menu;
+    document.getElementById('ro2-en').textContent = orderState.menuEn;
+    const opts = document.getElementById('ro2-options');
+    opts.innerHTML = '';
+
+    let basePriceWithSize = orderState.basePrice;
+    if(orderState.size === 'Grande') basePriceWithSize += 600;
+    else if(orderState.size === 'Venti') basePriceWithSize += 1400;
+
+    const rows = [
+      { label: getBaseLabel(), price: formatPrice(basePriceWithSize), showPrice: true, priceValue: basePriceWithSize },
+    ];
+
+    // 수정된 옵션만 표시 (editedOptions)
+    optionDefs.forEach(opt => {
+      if(opt.hidden && opt.hidden()) return;
+
+      // size는 항상 표시 (getBaseLabel에 포함), 나머지는 editedOptions에 있는 것만 표시
+      if(opt.id !== 'size' && !editedOptions.has(opt.id)) return;
+
+      const val = opt.getVal();
+
+      // whipping은 '없음'이어도 표시해야 함
+      if(opt.id === 'whipping') {
+        const whipLabel = val === '없음' ? '휘핑 없이' : `휘핑 ${val}`;
+        rows.push({label:whipLabel, price:null, showPrice:false, priceValue:0});
+        return;
+      }
+
+      // frappuccinoSyrupType 처리
+      if(opt.id === 'frappuccinoSyrupType') {
+        if(val && val !== '없음') {
+          rows.push({label:`프라푸치노용시럽 ${val}`, price:null, showPrice:false, priceValue:0});
+        }
+        return;
+      }
+
+      if(!val || val === '없음') return;
+
+      let price = null;
+      let priceValue = 0;
+      let showPrice = true;
+
+      if(opt.id === 'size') return;
+      else if(opt.id === 'bean' && (orderState.bean === 'Decaf' || orderState.bean === '1/2 Decaf')) {
+        price = formatPrice(300);
+        priceValue = 300;
+      } else if(opt.id === 'shot') {
+        if(orderState.extraShots > 0) {
+          const shotPrice = orderState.extraShots * 800;
+          rows.push({label:'에스프레소샷 '+orderState.extraShots+'샷 추가',price:formatPrice(shotPrice),showPrice:true,priceValue:shotPrice});
+        }
+        return;
+      } else if(opt.id === 'bean') {
+        showPrice = false;
+      } else if(opt.id === 'milk') {
+        if(orderState.milk === '오트') {
+          price = formatPrice(800);
+          priceValue = 800;
+        } else {
+          showPrice = false;
+        }
+      } else if(opt.id === 'javachip' || opt.id === 'ice') {
+        showPrice = false;
+      } else if(opt.id === 'milkTemp' || opt.id === 'milkFoam') {
+        showPrice = false;
+      } else if(opt.id === 'mokaSyrup' && orderState.mokaSyrupCount > 0) {
+        showPrice = false;
+      } else if(opt.id === 'vanillaSyrup' && orderState.vanillaSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'hazelnutSyrup' && orderState.hazelnutSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'caramelSyrup' && orderState.caramelSyrupCount > 0) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'syrup') {
+        orderState.syrups.forEach(s => {
+          rows.push({label:s.name+' 시럽 '+s.count+'펌프',price:formatPrice(800),showPrice:true,priceValue:800});
+        });
+        return;
+      } else if(opt.id === 'caramelDrizzle' && orderState.caramelDrizzle) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'chocolateDrizzle' && orderState.chocolateDrizzle) {
+        price = formatPrice(800);
+        priceValue = 800;
+      } else if(opt.id === 'water' || opt.id === 'temp') {
+        return;
+      }
+
+      if(val && val !== '없음') {
+        rows.push({label:opt.label+' '+val, price:price, showPrice:showPrice, priceValue:priceValue});
+      }
+    });
+
+    const quantity = orderState.quantity || 1;
+    rows.push({label:'수량 '+quantity, isQuantity: true});
+
+    rows.forEach(r=>{
+      const row = document.createElement('div');
+      row.className = 'order-opt-row';
+      if(r.isQuantity) {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span>`;
+      } else if(r.showPrice) {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span><span class="order-opt-price">${r.price}</span>`;
+      } else {
+        row.innerHTML = `<span class="order-opt-label">${r.label}</span>`;
+      }
+      opts.appendChild(row);
+    });
+
+    const total = calcTotal();
+    document.getElementById('ro2-total').textContent = formatPrice(total);
+  }
+  
+  function toggleOptOpen(id) {
+    const body = document.getElementById('optbody-'+id);
+    const toggle = document.getElementById('opt-'+id);
+    if(!body||!toggle) return;
+    const isOpen = toggle.classList.contains('open');
+    // close all
+    document.querySelectorAll('.opt-toggle').forEach(t=>{ t.classList.remove('open'); });
+    if(!isOpen) {
+      toggle.classList.add('open');
+      // 토글 열렸을 때 자동으로 스크롤
+      setTimeout(() => {
+        const container = toggle.closest('.reorder-options') || document.querySelector('.reorder-options');
+        if(container) {
+          toggle.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+      }, 50);
+    }
+  }
+  function toggleOptOpenOL(id) {
+    const body = document.getElementById('olbody-'+id);
+    const toggle = document.getElementById('ol-opt-'+id);
+    if(!body||!toggle) return;
+    const isOpen = toggle.classList.contains('open');
+    document.querySelectorAll('#optionlist-wrap .opt-toggle').forEach(t=>t.classList.remove('open'));
+    if(!isOpen) toggle.classList.add('open');
+  }
+  function getKoreanParticle(word, p1, p2) {
+    const code = word.charCodeAt(word.length - 1);
+    if(code >= 0xAC00 && code <= 0xD7A3) {
+      return ((code - 0xAC00) % 28) ? p1 : p2;
+    }
+    return p2;
+  }
+
+  function levenshteinDistance(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+    for(let i = 0; i <= m; i++) dp[i][0] = i;
+    for(let j = 0; j <= n; j++) dp[0][j] = j;
+    for(let i = 1; i <= m; i++) {
+      for(let j = 1; j <= n; j++) {
+        if(a[i-1] === b[j-1]) dp[i][j] = dp[i-1][j-1];
+        else dp[i][j] = 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      }
+    }
+    return dp[m][n];
+  }
+
+  function findClosestMatch(input, candidates, threshold = 2) {
+    let bestMatch = null;
+    let bestDistance = threshold;
+    for(const candidate of candidates) {
+      const dist = levenshteinDistance(input, candidate);
+      if(dist < bestDistance) {
+        bestDistance = dist;
+        bestMatch = candidate;
+      }
+    }
+    return bestMatch;
+  }
+
+  function matchAmountKeyword(text) {
+    const amounts = ['많이','보통','적게'];
+    const exactMatch = amounts.find(a => text.includes(a));
+    if(exactMatch) return exactMatch;
+    const similar = findClosestMatch(text, amounts, 1);
+    return similar;
+  }
+
+  function matchWhippingKeyword(text) {
+    if(/휘핑|티핑|히핑|휘핀|티핀/.test(text)) return true;
+    return false;
+  }
+
+  function applyOption(optId, value, btn) {
+    const def = optionDefs.find(o=>o.id===optId);
+    if(!def) return;
+    def.apply(value);
+    // update displayed value
+    document.getElementById('optval-'+optId).textContent = def.getVal();
+    // highlight row
+    const toggle = document.getElementById('opt-'+optId);
+    if(toggle) toggle.classList.add('highlighted');
+    // update active buttons
+    const body = document.getElementById('optbody-'+optId);
+    if(body) body.querySelectorAll('.opt-sub-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    // [수정 2] 옵션 변경 시 실시간 TTS 피드백
+    const p1 = getKoreanParticle(def.label, '을', '를');
+    const p2 = getKoreanParticle(value, '으로', '로');
+    speakTTS(def.label + p1 + ' ' + value + p2 + ' 변경했습니다.');
+  }
+  function applyOptionOL(optId, value, btn) {
+    const def = optionDefs.find(o=>o.id===optId);
+    if(!def) return;
+    def.apply(value);
+    document.getElementById('olval-'+optId).textContent = def.getVal();
+    const toggle = document.getElementById('ol-opt-'+optId);
+    if(toggle) toggle.classList.add('highlighted');
+    const body = document.getElementById('olbody-'+optId);
+    if(body) body.querySelectorAll('.opt-sub-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const p1 = getKoreanParticle(def.label, '을', '를');
+    const p2 = getKoreanParticle(value, '으로', '로');
+    speakTTS(def.label + p1 + ' ' + value + p2 + ' 변경했습니다.');
+  }
+  
+  // ═══════════════════════════════════════
+  //  RECOMMEND
+  // ═══════════════════════════════════════
+  function selectRec(i) {
+    // clear all
+    [0,1,2].forEach(j=>{
+      const card = document.getElementById('rec-'+j);
+      const chk = document.getElementById('rec-check-'+j);
+      if(card) card.classList.remove('selected');
+      if(chk) chk.style.display='none';
+    });
+    // select this
+    selectedRecIndex = i;
+    const card = document.getElementById('rec-'+i);
+    const chk = document.getElementById('rec-check-'+i);
+    if(card) card.classList.add('selected');
+    if(chk) chk.style.display='block';
+    // [수정 5] recMenus 배열로부터 orderState 업데이트
+    orderState.menu = recMenus[i].name;
+    orderState.menuEn = recMenus[i].en;
+    orderState.temp = recMenus[i].temp || 'ICED';
+    orderState.basePrice = recMenus[i].price;
+    if(orderState.temp === 'HOT') orderState.ice = '없음';
+    speakTTS(recMenus[i].name+'를 선택하셨어요. 주문 내역을 확인할게요.', ()=> goToOrderCheck());
+  }
+  
+  // ═══════════════════════════════════════
+  //  REQUEST1 (contradiction)
+  // ═══════════════════════════════════════
+  function selectTemp(temp) {
+    orderState.temp = temp;
+    document.getElementById('req-hot').classList.remove('selected');
+    document.getElementById('req-iced').classList.remove('selected');
+    document.getElementById('req-'+temp.toLowerCase()).classList.add('selected');
+  
+    // [수정 3] 온도 선택 시 메뉴명 자동 동기화
+    // menuBase에서 '아이스'/'Hot' 키워드를 제거하고 온도에 맞는 정식 메뉴명으로 변환
+    if(temp === 'HOT') {
+      orderState.ice = '없음';
+      // 현재 메뉴명에서 '아이스 ' 제거
+      let baseName = orderState.menu.replace(/^아이스\s+/i, '').replace(/^iced\s+/i, '');
+      // MENU_DB에서 HOT 버전 검색
+      const hotMenu = MENU_DB.find(m => m.temp === 'HOT' &&
+        (m.name === baseName || m.name.replace(/^(따뜻한|hot)\s+/i,'') === baseName));
+      if(hotMenu) {
+        orderState.menu = hotMenu.name;
+        orderState.basePrice = hotMenu.price;
+      } else {
+        // MENU_KEYWORD_MAP에서 HOT 버전 탐색
+        for(const km of MENU_KEYWORD_MAP) {
+          if(km.hotName && (km.icedName === orderState.menu || km.hotName.replace(/^(아이스|iced)\s+/i,'') === baseName)) {
+            orderState.menu = km.hotName;
+            orderState.basePrice = km.hotPrice || km.price || orderState.basePrice;
+            break;
+          }
+        }
+      }
+    } else {
+      // ICED: 현재 메뉴명에서 HOT 전용 이름이면 ICED 버전으로 교체
+      for(const km of MENU_KEYWORD_MAP) {
+        if(km.icedName && km.hotName === orderState.menu) {
+          orderState.menu = km.icedName;
+          orderState.basePrice = km.icedPrice || km.price || orderState.basePrice;
+          break;
+        }
+      }
+    }
+    // menuEn 갱신
+    orderState.menuEn = buildMenuEn(orderState.menu, temp);
+  
+    speakTTS(temp==='HOT'?'따뜻한 음료로 진행할게요.':'아이스로 진행할게요.', ()=> goToTranslation());
+  }
+  
+  function buildMenuEn(menuName, temp) {
+    // 간단한 영문명 생성
+    const map = {
+      '스타벅스 딸기 라떼': 'Starbucks Strawberry Latte',
+      '아이스 제주 말차 라떼': 'Iced Jeju Matcha Latte',
+      '제주 말차 라떼': 'Jeju Matcha Latte',
+      '자바 칩 프라푸치노': 'Java Chip Frappuccino',
+      '아이스 슈크림 말차 라떼': 'Iced Shucream Matcha Latte',
+      '슈크림 말차 라떼': 'Shucream Matcha Latte',
+      '아이스 시그니처 초콜릿': 'Iced Signature Chocolate',
+      '복숭아 아이스티': 'Peach Iced Tea',
+      '복숭아 핫 티': 'Peach Hot Tea',
+      '카라멜 프라푸치노': 'Caramel Frappuccino',
+      '자몽 허니 블렌디드': 'Grapefruit Honey Blended',
+      '아이스 자몽 허니 블랙 티': 'Iced Grapefruit Honey Black Tea',
+      '자몽 허니 블랙 티': 'Grapefruit Honey Black Tea',
+    };
+    return map[menuName] || menuName;
+  }
+  
+  // ═══════════════════════════════════════
+  //  TTS
+  // ═══════════════════════════════════════
+  function speakTTS(text, onEnd) {
+    if(!window.speechSynthesis) { if(onEnd) onEnd(); return; }
+    stopTTS();
+    isTTSPlaying = true;
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'ko-KR';
+    utt.rate = 1.05;
+    utt.onend = ()=>{ isTTSPlaying=false; if(onEnd) onEnd(); };
+    utt.onerror = ()=>{ isTTSPlaying=false; if(onEnd) onEnd(); };
+    window.speechSynthesis.speak(utt);
+  }
+  function stopTTS() {
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    isTTSPlaying = false;
+  }
+  
+  // ═══════════════════════════════════════
+  //  STT
+  // ═══════════════════════════════════════
+  function startSTT() {
+    if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    if(isSTTActive) return; // already running
+    stopSTT(); // 이전 STT를 먼저 종료
+  
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = 'ko-KR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+  
+    recognition.onstart = ()=>{
+      isSTTActive = true;
+      document.getElementById('stt-dot').classList.add('active');
+      resetInactivityTimer();
+    };
+  
+    recognition.onresult = (e)=>{
+      stopTTS();
+      resetInactivityTimer();
+      let interim = '', final = '';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) final += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      const txt = (final || interim).trim();
+      if(txt) updateTalkBubble(txt, !final);
+      if(final) processVoiceIntent(final.trim());
+    };
+  
+    recognition.onend = ()=>{
+      isSTTActive = false;
+      document.getElementById('stt-dot').classList.remove('active');
+      if(currentPage !== 'home') {
+        // auto-restart if still on a voice page
+        setTimeout(()=>{ if(currentPage!=='home') startSTT(); }, 500);
+      }
+    };
+  
+    recognition.onerror = (e)=>{
+      if(e.error==='no-speech') return;
+      isSTTActive = false;
+      document.getElementById('stt-dot').classList.remove('active');
+    };
+  
+    try { recognition.start(); } catch(err){}
+  }
+  
+  function stopSTT() {
+    if(recognition) {
+      try { recognition.stop(); } catch(e){}
+      recognition = null;
+    }
+    isSTTActive = false;
+    document.getElementById('stt-dot').classList.remove('active');
+    clearInactivityTimer();
+  }
+  
+  function toggleSTT() {
+    if(isSTTActive) {
+      stopSTT();
+      setPlayState('start', true);
+    } else {
+      clearTalkBubble('start');
+      startSTT();
+      setPlayState('start', false);
+    }
+  }
+  function toggleSTTPage(suffix) {
+    if(isSTTActive) { stopSTT(); } else { startSTT(); }
+  }
+  
+  // ═══════════════════════════════════════
+  //  INACTIVITY TIMER
+  // ═══════════════════════════════════════
+  function resetInactivityTimer() {
+    clearInactivityTimer();
+    inactivityTimer = setTimeout(()=>{
+      if(currentPage !== 'home' && isSTTActive) {
+        setPlayState(currentPage, true);
+      }
+    }, 15000);
+  }
+  function clearInactivityTimer() {
+    if(inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer=null; }
+  }
+  function setPlayState(page, show) {
+    const el = document.getElementById('vi-'+page+'-play');
+    if(el) el.classList.toggle('visible', show);
+    const lbl = document.getElementById('speak-label-'+page);
+    if(lbl) lbl.textContent = show ? '탭하여 재개' : '듣고 있어요';
+  }
+
+  function removePlayOverlay(page) {
+    const el = document.getElementById('vi-'+page+'-play');
+    if(el) el.classList.remove('visible');
+    startSTT();
+  }
+
+  // ═══════════════════════════════════════
+  //  TALK BUBBLE
+  // ═══════════════════════════════════════
+  function updateTalkBubble(text, isInterim) {
+    // find bubble for current page
+    const bubbleId = getTalkBubbleId();
+    const bubble = document.getElementById(bubbleId);
+    if(!bubble) return;
+    bubble.classList.add('visible');
+    bubble.innerHTML = isInterim
+      ? '<span class="talk-interim">'+text+'</span>'
+      : text;
+  }
+  function clearTalkBubble(page) {
+    const bubble = document.getElementById('talk-bubble-'+page);
+    if(bubble) { bubble.textContent=''; bubble.classList.remove('visible'); }
+  }
+  function getTalkBubbleId() {
+    const map = {
+      'start':'talk-bubble-start',
+      'ordercheck':'talk-bubble-ordercheck',
+      'confirm':'talk-bubble-confirm',
+      'recommend':'talk-bubble-rec',
+      'request1':'talk-bubble-req1',
+      'reorder1':'talk-bubble-reorder1',
+      'reorder2':'talk-bubble-reorder2',
+      'optionlist':'talk-bubble-optionlist',
+    };
+    return map[currentPage] || null;
+  }
+  
+  // ═══════════════════════════════════════
+  //  INTENT PROCESSING
+  // ═══════════════════════════════════════
+  const NUMBER_MAP = {'하나':1,'둘':2,'셋':3,'넷':4,'한':1,'두':2,'세':3,'네':4,'한개':1,'두개':2,'세개':3,'네개':4};
+
+  function parseNumber(txt) {
+    for(const [k,v] of Object.entries(NUMBER_MAP)) if(txt.includes(k)) return v;
+    const m = txt.match(/(\d+)/);
+    return m ? parseInt(m[1]) : 1;
+  }
+  
+  // [수정 4] 엄격한 메뉴 인식 - 발화에 명확한 키워드가 있을 때만 매칭
+  function detectMenuFromSpeech(t) {
+    const t_no_space = t.replace(/\s+/g, '');
+    let bestMatch = null;
+    let bestKeyLen = 0;
+
+    // 정확한 매칭 우선
+    for(const km of MENU_KEYWORD_MAP) {
+      for(const kw of km.keywords) {
+        const kw_no_space = kw.replace(/\s+/g, '');
+        if((t.includes(kw) || t_no_space.includes(kw_no_space)) && kw.length > bestKeyLen) {
+          bestMatch = km;
+          bestKeyLen = kw.length;
+        }
+      }
+    }
+
+    // 정확한 매칭이 없으면 유사도 기반 매칭 (threshold 증가: 더 많은 유사 발음 허용)
+    if(!bestMatch) {
+      let bestDistance = 5; // threshold 증가 (3 → 5)
+      for(const km of MENU_KEYWORD_MAP) {
+        for(const kw of km.keywords) {
+          const kw_no_space = kw.replace(/\s+/g, '');
+          const dist = levenshteinDistance(t_no_space, kw_no_space);
+          if(dist < bestDistance) {
+            bestDistance = dist;
+            bestMatch = km;
+          }
+        }
+      }
+    }
+
+    // "프라", "브라" (ㅍ→ㅂ), "자바", "잡", "팔", "칩" 등 프라푸치노 관련 단어가 조금이라도 있으면 자바칩 프라푸치노로 인식
+    if(!bestMatch && /프라|브라|자바|잡|팔|칩/.test(t)) {
+      bestMatch = MENU_KEYWORD_MAP.find(km => km.base && km.base.includes('자바 칩'));
+    }
+
+    return bestMatch;
+  }
+  
+  // 온도 감지 (명시적 키워드만)
+  function detectTemp(t) {
+    const hasHot = /따뜻한|따뜻하게|따뜻|핫\s|^핫$|hot\b|뜨거운/.test(t);
+    const hasIced = /아이스|iced\b|차가운|냉/.test(t);
+    if(hasHot && !hasIced) return 'HOT';
+    if(hasIced && !hasHot) return 'ICED';
+    if(hasHot && hasIced) return 'CONFLICT';
+    return null;
+  }
+  
+  function processVoiceIntent(text) {
+    const t = text.toLowerCase().replace(/\s+/g,' ').trim();
+  
+    // Back navigation
+    if(t.includes('이전')) { goBack(); return; }
+
+    // Page-specific intents
+    if(currentPage === 'start' || currentPage === 'ordercheck' || currentPage === 'reorder1' || currentPage === 'reorder2' || currentPage === 'optionlist') {
+
+      // [수정] reorder1에서 완료/주문 명령 → reorder2로 이동
+      if(currentPage === 'reorder1' && /완료|주문해줘|주문|다음/.test(t)) {
+        buildReorderOptions();
+        goToReorder2(); return;
+      }
+
+      // Order / confirm
+      if(/주문|맞아|확인|네|맞습니다/.test(t)) {
+        if(currentPage==='ordercheck'||currentPage==='reorder2') { goToAddToCart(); return; }
+      }
+      // Edit (but not on start page, where "변경" is part of initial order)
+      if(/수정|고쳐|바꿔|변경/.test(t) && currentPage!=='reorder1' && currentPage!=='start') {
+        const result = parseAndApplyOptions(t);
+        goToReorder();
+        return;
+      }
+      // List or Order Summary and Re-read commands
+      if(/목록|리스트|목록보여|내가뭘|주문목록|주문\s*내용\s*읽어|주문\s*읽어|지금까지주문|주문다시|다시들을|다시들어|^다시$|뭐라고|다시\s*말해|다시\s*알려|다시\s*한번|다시\s*확인|안들렸|안들려|다시\s*읽어|읽어\s*줘|메뉴\s*읽어|옵션\s*다시\s*말해|옵션\s*다시\s*읽어/.test(t)) {
+        if(currentPage === 'ordercheck' || currentPage === 'reorder2') {
+          const summaryText = buildOrderSummaryTTS();
+          speakTTS(summaryText, ()=>{ startSTT(); });
+          return;
+        }
+        goToOptionList(); return;
+      }
+
+      // reorder1에서 옵션 읽기
+      if(currentPage === 'reorder1' && /커스텀\s*옵션\s*목록|옵션\s*리스트\s*알려|옵션은\s*뭐|옵션\s*목록\s*알려|옵션\s*목록|옵션\s*리스트|옵션\s*종류는\s*뭐|옵션\s*종류\s*알려|옵션\s*(알려|리스트|뭐|종류|종료|목록)/.test(t)) {
+        readReorderOptionsList();
+        return;
+      }
+
+      // Menu name recognition (for start page) - Check this first before option modification
+      if(currentPage === 'start') {
+        const menuMatch = detectMenuFromSpeech(t);
+        const tempDetected = detectTemp(t);
+
+        // [수정 4] 모순 감지 → Request1 페이지로
+        if(tempDetected === 'CONFLICT') {
+          if(menuMatch) applyMenuFromKeywordMap(menuMatch, null);
+          goToRequest1(); return;
+        }
+
+        // 온도 설정 (명시적 언급된 경우만)
+        if(tempDetected === 'ICED') { orderState.temp = 'ICED'; }
+        else if(tempDetected === 'HOT') { orderState.temp = 'HOT'; orderState.ice = '없음'; }
+
+        if(menuMatch) {
+          // 메뉴 적용
+          applyMenuFromKeywordMap(menuMatch, orderState.temp);
+
+          // 아메리카노 또는 프라푸치노인 경우: 즉시 옵션 파싱 후 ordercheck으로 이동
+          if(orderState.menu.includes('아메리카노') || orderState.menu.includes('프라푸')) {
+            editedOptions.clear(); // 새로운 주문이므로 이전 편집 옵션 초기화
+            const optResult = parseAndApplyOptions(t);
+
+            // 온도나 옵션이 있으면 ordercheck으로 바로 이동
+            if(tempDetected || optResult.changed) {
+              updateOrderCheckUI();
+              updateDrinkImage();
+              goToOrderCheck();
+            } else {
+              goToTranslation();
+            }
+          } else {
+            // 다른 메뉴: 기존대로 translation으로 이동
+            editedOptions.clear();
+            goToTranslation();
+          }
+        } else if(t.length > 2) {
+          // 메뉴 인식 실패 → 추천 페이지 (임의 배정 금지)
+          goToRecommend();
+        }
+        return;
+      }
+
+      // reorder1, reorder2, optionlist에서는 메뉴 감지 금지
+      if(currentPage === 'reorder1' || currentPage === 'reorder2' || currentPage === 'optionlist') {
+        // Direct option modification from any page (except start)
+        const result = parseAndApplyOptions(t);
+        if(result.changed) {
+          if(currentPage === 'reorder1') {
+            buildReorderOptions();
+            const msgs = result.changedOptions.map(opt => {
+              const p1 = getKoreanParticle(opt.label, '이', '가');
+              const p2 = getKoreanParticle(opt.value, '으로', '로');
+              return opt.label + p1 + ' ' + opt.value + p2 + ' 바뀌었어요';
+            });
+            const ttsMsg = msgs.join('. ');
+            speakTTS(ttsMsg, ()=>{ startSTT(); });
+            return;
+          } else if(currentPage === 'reorder2') {
+            updateReorder2UI();
+            speakTTS('옵션이 업데이트됐어요. 이대로 주문할까요?', ()=>{ startSTT(); });
+            return;
+          } else if(currentPage === 'optionlist') {
+            buildOptionList();
+            return;
+          }
+        } else if(currentPage === 'reorder1' && !result.changed) {
+          // reorder1에서 옵션 변경 없으면 오류 메시지
+          speakTTS('잘못 들었어요. 다시 말씀해주세요.', ()=>{ startSTT(); });
+          return;
+        }
+        return;
+      }
+
+      // Direct option modification for ordercheck page
+      const result = parseAndApplyOptions(t);
+      if(result.changed && currentPage === 'ordercheck') {
+        updateOrderCheckUI();
+        speakTTS('옵션이 업데이트됐어요. 이대로 주문할까요?', ()=>{ startSTT(); });
+        return;
+      }
+    }
+  
+    // Confirm page
+    if(currentPage === 'confirm') {
+      if(/네|맞아|확인|주문|좋아|그래/.test(t)) { goToAddToCart(); return; }
+      if(/수정|아니/.test(t)) { goToReorder(); return; }
+    }
+  
+    // Recommend page
+    if(currentPage === 'recommend') {
+      if(/딸기 라떼|딸기라떼/.test(t)) { selectRec(0); return; }
+      if(/말차/.test(t)) { selectRec(1); return; }
+      if(/자바 칩|자바칩|프라푸/.test(t)) { selectRec(2); return; }
+      const m = t.match(/(\d+)번?째?|첫\s*번째|두\s*번째|세\s*번째/);
+      if(m) {
+        const i = ['첫','두','세'].findIndex(k=>t.includes(k));
+        selectRec(i>=0?i:parseInt(m[1])-1); return;
+      }
+    }
+  
+    // Request1
+    if(currentPage === 'request1') {
+      if(/따뜻|핫|hot/.test(t)) { selectTemp('HOT'); return; }
+      if(/아이스|iced|차가/.test(t)) { selectTemp('ICED'); return; }
+    }
+  }
+  
+  // 키워드 매핑에서 메뉴를 orderState에 적용
+  function applyMenuFromKeywordMap(km, preferredTemp) {
+    let finalTemp = preferredTemp || orderState.temp;
+  
+    if(km.temps.length === 1 && km.temps[0] === 'ICED') {
+      orderState.temp = 'ICED';
+      orderState.menu = km.icedName || km.name || km.base;
+      orderState.basePrice = km.icedPrice || km.price || 5000;
+    } else if(km.temps.length === 1 && km.temps[0] === 'HOT') {
+      orderState.temp = 'HOT';
+      orderState.ice = '없음';
+      orderState.menu = km.hotName || km.name || km.base;
+      orderState.basePrice = km.hotPrice || km.price || 5000;
+    } else {
+      if(finalTemp === 'HOT') {
+        orderState.menu = km.hotName || km.base;
+        orderState.basePrice = km.hotPrice || km.price || 5000;
+        orderState.ice = '없음';
+      } else if(finalTemp === 'ICED') {
+        orderState.menu = km.icedName || km.base;
+        orderState.basePrice = km.icedPrice || km.price || 5000;
+      } else {
+        // 온도 미결 → ICED 기본
+        orderState.temp = 'ICED';
+        orderState.menu = km.icedName || km.name || km.base;
+        orderState.basePrice = km.icedPrice || km.price || 5000;
+      }
+    }
+    orderState.menuEn = buildMenuEn(orderState.menu, orderState.temp);
+
+    // 프라푸치노 선택 시 모카시럽 기본값 설정 (Tall=3, Grande=4, Venti=5)
+    if(orderState.menu.includes('프라푸')) {
+      orderState.mokaSyrupCount = orderState.size==='Tall'?3:(orderState.size==='Grande'?4:5);
+    }
+  }
+  
+  // [수정 4] 엄격한 옵션 파싱 - 명확한 키워드가 있을 때만 orderState 업데이트
+  function parseAndApplyOptions(t) {
+    const SHOT_SYNONYMS = ['샷','삿','삽','삼','샵','쌋','쌍','샃','싸','잡','샤','샷트','셧','사'];
+    const SYRUP_SYNONYMS = ['싫어','실업','시러','실럽','쉬럽','시롭','시럽'];
+    const DRIZZLE_SYNONYMS = ['드리잘','드리지','드릴을','드리즈','들이즈','들이즐이','들이자','드리즐'];
+    let changed = false;
+    const changedOptions = [];
+
+    // Size - 명확한 키워드만
+    if(/벤티|venti/.test(t)) {
+      orderState.size='Venti';
+      const newBaseShots = 4;
+      orderState.shots = newBaseShots;
+      orderState.extraShots = 0;
+      editedOptions.add('size');
+      changedOptions.push({id:'size', label:'사이즈', value:'Venti'});
+      changed=true;
+      // Update shot UI
+      const optvalShot1 = document.getElementById('optval-shot');
+      if(optvalShot1) optvalShot1.textContent = newBaseShots+'샷 (기본 '+newBaseShots+' + 추가 0)';
+      const shotBtns1 = document.querySelectorAll('#optbody-shot .opt-sub-btn');
+      shotBtns1.forEach(btn => { btn.classList.toggle('active', btn.textContent.startsWith(newBaseShots+'샷')); });
+    }
+    else if(/그란데|grande/.test(t)) {
+      orderState.size='Grande';
+      const newBaseShots = 3;
+      orderState.shots = newBaseShots;
+      orderState.extraShots = 0;
+      editedOptions.add('size');
+      changedOptions.push({id:'size', label:'사이즈', value:'Grande'});
+      changed=true;
+      // Update shot UI
+      const optvalShot2 = document.getElementById('optval-shot');
+      if(optvalShot2) optvalShot2.textContent = newBaseShots+'샷 (기본 '+newBaseShots+' + 추가 0)';
+      const shotBtns2 = document.querySelectorAll('#optbody-shot .opt-sub-btn');
+      shotBtns2.forEach(btn => { btn.classList.toggle('active', btn.textContent.startsWith(newBaseShots+'샷')); });
+    }
+    else if(/\b톨\b|\btall\b/.test(t)) {
+      orderState.size='Tall';
+      const newBaseShots = 2;
+      orderState.shots = newBaseShots;
+      orderState.extraShots = 0;
+      editedOptions.add('size');
+      changedOptions.push({id:'size', label:'사이즈', value:'Tall'});
+      changed=true;
+      // Update shot UI
+      const optvalShot3 = document.getElementById('optval-shot');
+      if(optvalShot3) optvalShot3.textContent = newBaseShots+'샷 (기본 '+newBaseShots+' + 추가 0)';
+      const shotBtns3 = document.querySelectorAll('#optbody-shot .opt-sub-btn');
+      shotBtns3.forEach(btn => { btn.classList.toggle('active', btn.textContent.startsWith(newBaseShots+'샷')); });
+    }
+    else if(/쇼트|쇼츠|숏/.test(t)) {
+      orderState.size='Short';
+      const newBaseShots = 1;
+      orderState.shots = newBaseShots;
+      orderState.extraShots = 0;
+      editedOptions.add('size');
+      changedOptions.push({id:'size', label:'사이즈', value:'Short'});
+      changed=true;
+      // Update shot UI
+      const optvalShot4 = document.getElementById('optval-shot');
+      if(optvalShot4) optvalShot4.textContent = newBaseShots+'샷 (기본 '+newBaseShots+' + 추가 0)';
+      const shotBtns4 = document.querySelectorAll('#optbody-shot .opt-sub-btn');
+      shotBtns4.forEach(btn => { btn.classList.toggle('active', btn.textContent.startsWith(newBaseShots+'샷')); });
+    }
+
+    // Shots - 에스프레소/샷/샵 처리
+    // "에스프레소", "샷", "샵" 키워드 감지 후 샷 추가
+    if(/에스프레소|샷|샵/.test(t)) {
+      // 숫자 추출 (예: "샷 2개", "에스프레소 한개")
+      let numMatch = t.match(/(에스프레소|샷|샵)[^가-힣]*(하나|둘|셋|한|두|세|네|\\d+)(?:개)?/);
+      let num = 1;
+      if(numMatch && numMatch[2]) {
+        num = parseNumber(numMatch[2]) || 1;
+      }
+
+      // "추가샷", "샷추가" 등 명시적 추가 표현이 있으면 추가로 처리
+      if(/추가\s*샷|샷\s*추가|에스프레소\s*추가|추가\s*에스프레소/.test(t)) {
+        const baseShots = orderState.size==='Venti'?4:(orderState.size==='Grande'?3:2);
+        orderState.extraShots = num;
+        orderState.shots = baseShots + num;
+      } else {
+        // "샷 2개" 같은 총 샷 개수로 해석하거나, 기본 추가로 처리
+        const baseShots = orderState.size==='Venti'?4:(orderState.size==='Grande'?3:2);
+        orderState.extraShots = num;
+        orderState.shots = baseShots + num;
+      }
+
+      editedOptions.add('shot');
+      changedOptions.push({id:'shot', label:'에스프레소샷', value:orderState.shots+'샷'});
+      changed = true;
+    }
+
+    // Bean - decaf/디카페인/디카프 등 감지
+    const beanKeywords = { 'Decaf': ['decaf','디카페인','디카프','디카'], 'Blonde': ['blonde','블론드'], '1/2 Decaf': ['하프','half'] };
+    for(const [beanType, keywords] of Object.entries(beanKeywords)) {
+      for(const kw of keywords) {
+        if(t.includes(kw)) {
+          orderState.bean = beanType; editedOptions.add('bean'); changedOptions.push({id:'bean', label:'원두', value:beanType}); changed=true;
+          break;
+        }
+      }
+    }
+
+    // Syrup - 시럽 종류 + "시럽"/"펌프" 또는 유사 키워드가 같이 있을 때만
+    // 개별 처리(헤이즐넛, 바닐라, 카라멜)를 피하기 위해 공통 시럽은 제외
+    const syrupTypes = [];
+    const syrupKwCandidates = ['시럽','펌프','시렵','실업','짜럽'];
+    const hasSyrupKw = syrupKwCandidates.some(kw => t.includes(kw) || findClosestMatch(t.split(/\s+/).join(''), [kw], 1));
+    syrupTypes.forEach(s=>{
+      if(t.includes(s) && hasSyrupKw) {
+        const numMatch = t.match(new RegExp(s + '[^가-힣]*(하나|둘|셋|한|두|세|\\d+)'));
+        const cnt = numMatch ? parseNumber(numMatch[1]) : 1;
+        const existing = orderState.syrups.findIndex(sy=>sy.name===s);
+        if(existing>=0) orderState.syrups[existing].count=cnt;
+        else orderState.syrups.push({name:s, count:cnt});
+        editedOptions.add('syrup'); changedOptions.push({id:'syrup', label:'시럽', value:s+' '+cnt+'개'}); changed=true;
+      }
+    });
+    if(/시럽\s*(없이|없음|빼)/.test(t)) {
+      orderState.syrups=[]; editedOptions.add('syrup'); changedOptions.push({id:'syrup', label:'시럽', value:'없음'}); changed=true;
+    }
+
+    // Caramel Syrup - "카라멜 시럽 하나", "카라멜시럽 하나추가" 등
+    if(/카라멜\s*시럽/.test(t)) {
+      const caramelMatch = t.match(/카라멜\s*시럽\s*[추가]*\s*(하나|둘|셋|한|두|세|네|\\d+)?/);
+      if(caramelMatch && caramelMatch[1]) {
+        const cnt = parseNumber(caramelMatch[1]) || 1;
+        orderState.caramelSyrupCount = cnt;
+        editedOptions.add('caramelSyrup');
+        changedOptions.push({id:'caramelSyrup', label:'카라멜시럽', value:cnt+'개'});
+        changed = true;
+      } else if(/없이|없음|빼/.test(t)) {
+        orderState.caramelSyrupCount = 0;
+        editedOptions.add('caramelSyrup');
+        changedOptions.push({id:'caramelSyrup', label:'카라멜시럽', value:'없음'});
+        changed = true;
+      } else if(/카라멜\s*시럽/.test(t)) {
+        // 숫자 없이 "카라멜시럽"만 있으면 기본값 1개
+        orderState.caramelSyrupCount = 1;
+        editedOptions.add('caramelSyrup');
+        changedOptions.push({id:'caramelSyrup', label:'카라멜시럽', value:'1개'});
+        changed = true;
+      }
+    }
+
+    // Ice - "얼음 XX" 명확한 패턴만
+    if(/얼음/.test(t)) {
+      if(/없이|없음/.test(t)) { orderState.ice='없이'; editedOptions.add('ice'); changedOptions.push({id:'ice', label:'얼음', value:'없이'}); changed=true; }
+      else {
+        const amount = matchAmountKeyword(t);
+        if(amount) { orderState.ice=amount; editedOptions.add('ice'); changedOptions.push({id:'ice', label:'얼음', value:amount}); changed=true; }
+      }
+    }
+
+    // Milk - 명확한 우유 종류 언급시만
+    if(/두유/.test(t)) { orderState.milk='두유'; editedOptions.add('milk'); changedOptions.push({id:'milk', label:'우유', value:'두유'}); changed=true; }
+    else if(/오트|귀리/.test(t)) { orderState.milk='오트'; editedOptions.add('milk'); changedOptions.push({id:'milk', label:'우유', value:'오트'}); changed=true; }
+    else if(/저지방/.test(t)) { orderState.milk='저지방'; editedOptions.add('milk'); changedOptions.push({id:'milk', label:'우유', value:'저지방'}); changed=true; }
+    else if(/무지방/.test(t)) { orderState.milk='무지방'; editedOptions.add('milk'); changedOptions.push({id:'milk', label:'우유', value:'무지방'}); changed=true; }
+
+    // Whip - 휘핑 및 유사 발음 인식
+    if(matchWhippingKeyword(t)) {
+      if(/없이|없음|빼/.test(t)) { orderState.whipping='없음'; editedOptions.add('whipping'); changedOptions.push({id:'whipping', label:'휘핑', value:'없음'}); changed=true; }
+      else {
+        // "마니"를 "많이"로 변환
+        let normalizedT = t.replace(/마니/g, '많이');
+        const amount = matchAmountKeyword(normalizedT);
+        if(amount) { orderState.whipping=amount; editedOptions.add('whipping'); changedOptions.push({id:'whipping', label:'휘핑', value:amount}); changed=true; }
+      }
+    }
+
+    // Frappuccino Syrup Type - "라이트", "라이트시럽", "라이트로" 등
+    if(orderState.menu && orderState.menu.includes('프라푸')) {
+      if(/라이트/.test(t)) { orderState.frappuccinoSyrupType='라이트'; editedOptions.add('frappuccinoSyrupType'); changedOptions.push({id:'frappuccinoSyrupType', label:'프라푸치노용시럽', value:'라이트'}); changed=true; }
+      else if(/일반/.test(t)) { orderState.frappuccinoSyrupType='일반'; editedOptions.add('frappuccinoSyrupType'); changedOptions.push({id:'frappuccinoSyrupType', label:'프라푸치노용시럽', value:'일반'}); changed=true; }
+    }
+
+    // Vanilla Syrup - "바닐라 시럽 한펌프", "바닐라 시럽 한개", "바닐라 시럽 하나", "바닐라시럽 추가"
+    if(/바닐라\s*시럽/.test(t)) {
+      const vanillaMatch = t.match(/바닐라\s*시럽\s+(하나|둘|셋|한|두|세|네|\\d+)(?:개|펌프)?/);
+      if(vanillaMatch) {
+        const cnt = parseNumber(vanillaMatch[1]) || 1;
+        orderState.vanillaSyrupCount = cnt;
+        editedOptions.add('vanillaSyrup');
+        changedOptions.push({id:'vanillaSyrup', label:'바닐라시럽', value:cnt+'개'});
+        changed = true;
+      } else if(/없이|없음|빼/.test(t)) {
+        orderState.vanillaSyrupCount = 0;
+        editedOptions.add('vanillaSyrup');
+        changedOptions.push({id:'vanillaSyrup', label:'바닐라시럽', value:'없음'});
+        changed = true;
+      } else if(/바닐라\s*시럽/.test(t)) {
+        // 숫자 없이 "바닐라시럽"만 있으면 기본값 1개
+        orderState.vanillaSyrupCount = 1;
+        editedOptions.add('vanillaSyrup');
+        changedOptions.push({id:'vanillaSyrup', label:'바닐라시럽', value:'1개'});
+        changed = true;
+      }
+    }
+
+    // Hazelnut Syrup - "헤이즐넛 시럽 하나", "헤이즐넛 시럽 한펌프", "헤이즐넛 시럽 한개"
+    if(/헤이즐넛\s*시럽/.test(t)) {
+      const hazelnutMatch = t.match(/헤이즐넛\s*시럽\s+(하나|둘|셋|한|두|세|네|\\d+)(?:개|펌프)?/);
+      if(hazelnutMatch) {
+        const cnt = parseNumber(hazelnutMatch[1]) || 1;
+        orderState.hazelnutSyrupCount = cnt;
+        editedOptions.add('hazelnutSyrup');
+        changedOptions.push({id:'hazelnutSyrup', label:'헤이즐넛시럽', value:cnt+'개'});
+        changed = true;
+      } else if(/없이|없음|빼/.test(t)) {
+        orderState.hazelnutSyrupCount = 0;
+        editedOptions.add('hazelnutSyrup');
+        changedOptions.push({id:'hazelnutSyrup', label:'헤이즐넛시럽', value:'없음'});
+        changed = true;
+      }
+    }
+
+    // Caramel Drizzle - "카라멜드리즐", "카라멜 드리즐", "사람을 드리즐" 등 음성 인식 오류도 처리
+    if(/(카라|사람|자람|싸람)\s*(멜|을)?\s*드리[즐지]/.test(t)) {
+      let amount = '보통';
+      const caramelDrizzleMatch = t.match(/(카라|사람|자람|싸람)[^가-힣]*(드리[즐지])[^가-힣]*(하나|한|두|둘|세|셋|\\d+|적게|보통|많이)?/);
+      if(caramelDrizzleMatch && caramelDrizzleMatch[3]) {
+        let matchAmount = caramelDrizzleMatch[3];
+        if(/하나|한|두|둘|세|셋|\\d+/.test(matchAmount)) { amount = '보통'; }
+        else { amount = matchAmount; }
+      }
+      orderState.caramelDrizzle = amount;
+      editedOptions.add('caramelDrizzle');
+      changedOptions.push({id:'caramelDrizzle', label:'카라멜드리즐', value:amount});
+      changed = true;
+    }
+
+    // Chocolate Drizzle - 다양한 유사 발음 모두 인식 (초콜렛, 들리지, 드리지, 때리지, 떼리지, 트리지 등)
+    if(/(초콜|참콜|콜초|떨리|참초|초콜레).*?(드리[즐지릴]|들리[즐지]|때리[지즐]|떼리[지즐]|테리[지즐]|데리[지즐]|도리[지즐]|트리[지즐름]|뜨리[지즐]|떠리[지즐]|드리)/.test(t)) {
+      let amount = '보통'; // 기본값
+      const chocolateDrizzleMatch = t.match(/(초콜|참콜|콜초|떨리|참초|초콜레).*?(드리[즐지릴]|들리[즐지]|때리[지즐]|떼리[지즐]|테리[지즐]|데리[지즐]|도리[지즐]|트리[지즐름]|뜨리[지즐]|떠리[지즐]|드리)[^가-힣]*(하나|한|두|둘|세|셋|\\d+|적게|보통|많이)?/);
+      if(chocolateDrizzleMatch && chocolateDrizzleMatch[3]) {
+        let matchAmount = chocolateDrizzleMatch[3];
+        if(/하나|한|두|둘|세|셋|\\d+/.test(matchAmount)) { amount = '보통'; }
+        else { amount = matchAmount; }
+      }
+      orderState.chocolateDrizzle = amount;
+      editedOptions.add('chocolateDrizzle');
+      changedOptions.push({id:'chocolateDrizzle', label:'초콜릿드리즐', value:amount});
+      changed = true;
+    }
+
+    // Water (Base) - "물 적게", "물 많이"
+    if(/물\s*(적게|보통|많이)/.test(t)) {
+      const waterMatch = t.match(/물\s*(적게|보통|많이)/);
+      if(waterMatch) {
+        orderState.water = waterMatch[1];
+        editedOptions.add('water');
+        changedOptions.push({id:'water', label:'물(베이스)', value:waterMatch[1]});
+        changed = true;
+      }
+    }
+
+    // Temperature - "뜨겁게", "핫", "따뜻하게", "차갑게", "시원하게", "아이스"
+    if(/뜨겁게|핫|따뜻하게/.test(t)) {
+      orderState.temp = 'HOT';
+      orderState.ice = '없음';
+      editedOptions.add('temp');
+      changedOptions.push({id:'temp', label:'온도', value:'HOT'});
+      changed = true;
+    } else if(/차갑게|시원하게|아이스/.test(t)) {
+      orderState.temp = 'ICED';
+      editedOptions.add('temp');
+      changedOptions.push({id:'temp', label:'온도', value:'ICED'});
+      changed = true;
+    }
+
+    // Milk Temperature - "우유 온도 덜뜨겁게", "우유 온도 많이 뜨겁게"
+    if(/우유\s*온도\s*(덜\s*뜨겁게|덜뜨겁게)/.test(t)) {
+      orderState.milkTemp = '덜 뜨겁게';
+      editedOptions.add('milkTemp');
+      changedOptions.push({id:'milkTemp', label:'우유 온도', value:'덜 뜨겁게'});
+      changed = true;
+    } else if(/우유\s*온도\s*(많이\s*뜨겁게|많이뜨겁게)/.test(t)) {
+      orderState.milkTemp = '많이 뜨겁게';
+      editedOptions.add('milkTemp');
+      changedOptions.push({id:'milkTemp', label:'우유 온도', value:'많이 뜨겁게'});
+      changed = true;
+    }
+
+    // Milk Foam - "우유 거품 적게", "우유 거품 없이", "우유 거품 많이"
+    if(/우유\s*거품\s*(적게|없이|많이)/.test(t)) {
+      const foamMatch = t.match(/우유\s*거품\s*(적게|없이|많이)/);
+      if(foamMatch) {
+        const foamType = foamMatch[1];
+        orderState.milkFoam = foamType;
+        editedOptions.add('milkFoam');
+        changedOptions.push({id:'milkFoam', label:'우유거품', value:foamType});
+        changed = true;
+      }
+    }
+
+    // Mocha Syrup - "모카시럽", "목화시럽", "목 화 시럽", "목하시럽", "모캬시럽" 등 모든 유사 발음 인식
+    if(/모카|목화|목\s*화|목하|모캬|목시럽|모카시럽|목화시럽/.test(t)) {
+      const mokaMatch = t.match(/(모카|목화|목\s*화|목하|모캬)?\s*시럽?\s*[^가-힣]*(하나|한|두|둘|세|셋|네|펌프|\\d+)?/);
+      if(mokaMatch) {
+        const baseCount = orderState.size==='Tall'?2:(orderState.size==='Grande'?3:4);
+        let additionalCount = 1;
+        const matchText = mokaMatch[2] || '';
+        if(/펌프/.test(matchText)) {
+          additionalCount = 1;
+        } else if(/두|둘/.test(matchText)) {
+          additionalCount = 2;
+        } else if(/세|셋/.test(matchText)) {
+          additionalCount = 3;
+        } else if(/네/.test(matchText)) {
+          additionalCount = 4;
+        } else if(/\\d+/.test(matchText)) {
+          additionalCount = parseInt(matchText) || 1;
+        }
+        orderState.mokaSyrupCount = baseCount + additionalCount;
+        editedOptions.add('mokaSyrup');
+        changedOptions.push({id:'mokaSyrup', label:'모카시럽', value:orderState.mokaSyrupCount+'(기본'+baseCount+'+추가'+additionalCount+')'});
+        changed = true;
+      } else if(/없이|없음|빼/.test(t)) {
+        orderState.mokaSyrupCount = 0;
+        editedOptions.add('mokaSyrup');
+        changedOptions.push({id:'mokaSyrup', label:'모카시럽', value:'없음'});
+        changed = true;
+      }
+    }
+
+    // Quantity - "수량은 한잔", "두 잔", "3잔"
+    if(/수량|잔|개/.test(t)) {
+      const quantityMatch = t.match(/(한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|\\d+)\s*(잔|개)/);
+      if(quantityMatch) {
+        const numStr = quantityMatch[1];
+        let quantity = parseNumber(numStr);
+        if(isNaN(quantity)) {
+          const digitMatch = numStr.match(/\d+/);
+          quantity = digitMatch ? parseInt(digitMatch[0]) : 1;
+        }
+        if(quantity > 0 && quantity <= 20) {
+          orderState.quantity = quantity;
+          editedOptions.add('quantity');
+          changedOptions.push({id:'quantity', label:'수량', value:quantity+'잔'});
+          changed = true;
+        }
+      }
+    }
+
+    // Java Chip - "통자바칩", "분쇄자바칩" 등
+    if(/통\s*자바|통자바|분쇄\s*자바|분쇄자바|자바\s*칩/.test(t)) {
+      if(/통\s*자바|통자바/.test(t)) {
+        orderState.javachip = '통자바칩';
+        editedOptions.add('javachip');
+        changedOptions.push({id:'javachip', label:'자바칩', value:'통자바칩'});
+        changed = true;
+      } else if(/분쇄\s*자바|분쇄자바/.test(t)) {
+        orderState.javachip = '분쇄자바칩';
+        editedOptions.add('javachip');
+        changedOptions.push({id:'javachip', label:'자바칩', value:'분쇄자바칩'});
+        changed = true;
+      }
+    }
+
+    return {changed, changedOptions};
+  }
+
+  // ═══════════════════════════════════════
+  //  FULLSCREEN TOGGLE
+  // ═══════════════════════════════════════
+  let isExpanded = false;
+  function toggleFullscreen() {
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    if (!isExpanded) {
+      // Expand to fullscreen
+      // For iOS Safari, use viewport-fit cover
+      const meta = document.querySelector('meta[name="viewport"]');
+      if (meta) {
+        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+      }
+
+      // Maximize app
+      app.style.position = 'fixed';
+      app.style.top = '0';
+      app.style.left = '0';
+      app.style.width = '100vw';
+      app.style.height = '100vh';
+      app.style.borderRadius = '0';
+
+      // Hide address bar on mobile
+      window.scrollTo(0, 1);
+      isExpanded = true;
+    } else {
+      // Collapse
+      app.style.position = '';
+      app.style.top = '';
+      app.style.left = '';
+      app.style.width = '';
+      app.style.height = '';
+      app.style.borderRadius = '';
+      isExpanded = false;
+    }
+  }
+
+  // Add fullscreen toggle on html/body click
+  document.addEventListener('click', (e) => {
+    const app = document.getElementById('app');
+    // Check if click is outside app or on empty background
+    if (!app || !app.contains(e.target) || e.target === document.body || e.target === document.documentElement) {
+      toggleFullscreen();
+    }
+  });
+
+  // ═══════════════════════════════════════
+  //  KEYBOARD SHORTCUT (Desktop testing)
+  // ═══════════════════════════════════════
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='h'||e.key==='H') { exitToHome(); return; }
+    if(e.key==='Escape') { if(currentPage!=='home') goBack(); return; }
+  });
+  
+  // ═══════════════════════════════════════
+  //  INIT
+  // ═══════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // Make app scroll-free on mobile
+    document.body.style.overscrollBehavior = 'none';
+  });
+  </script>
+  
+  
+  
+</body></html>
